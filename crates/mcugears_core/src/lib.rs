@@ -5,8 +5,8 @@ use std::iter::Iterator;
 trait Registers {
     // コンストラクタ
     fn new() -> Self;
-    // レジスタの種類,id,値などを受け取って変更したりする
-    fn operate(&mut self, operation: RegisterOperation) -> &mut Self;
+    // レジスタの種類、値などを受け取って変更したりする
+    fn operate(&mut self, operation: &RegisterOperation) -> &mut Self;
 }
 
 // レジスタの種類
@@ -17,9 +17,15 @@ enum RegisterKind {
 }
 
 // レジスタ操作の種類の列挙型
-enum RegisterOperation {
-    Set { kind: RegisterKind, value: u32 },
-    Read { kind: RegisterKind },
+enum RegisterOperation<'a> {
+    Set {
+        kind: RegisterKind,
+        value: u8, // 変更する値
+    },
+    Read {
+        kind: RegisterKind,
+        result: &'a mut u8, // 読み取った結果
+    },
     None,
 }
 
