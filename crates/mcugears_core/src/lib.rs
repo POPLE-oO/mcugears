@@ -9,9 +9,17 @@ trait Registers {
     fn operate(&mut self, operation: RegisterOperation) -> &mut Self;
 }
 
+// レジスタの種類
+enum RegisterKind {
+    General { id: u8 }, // 汎用レジスタ
+    Uart { id: u8 },    // UARTのステータス
+    Counter,
+}
+
 // レジスタ操作の種類の列挙型
 enum RegisterOperation {
-    Set { kind: String, id: u8, value: u8 },
+    Set { kind: RegisterKind, value: u32 },
+    Read { kind: RegisterKind },
     None,
 }
 
@@ -33,6 +41,7 @@ where
     commands: C,  // 命令列
 }
 
+// マイコン操作の実装
 impl<R, C> Mcu<R, C>
 where
     R: Registers,
