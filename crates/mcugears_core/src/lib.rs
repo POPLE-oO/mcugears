@@ -34,31 +34,41 @@ trait Command<R: Registers> {
     fn run(&self, registers: &mut R);
 }
 
-// 命令を連続処理するためのイテレータ
-trait CommandsIterator: Iterator {}
-
 // マイコン操作の実体オブジェクト
 struct Mcu<R, C>
 where
     R: Registers,
-    C: CommandsIterator,
+    C: Command<R>,
 {
-    registers: R, // レジスタの構造体
-    commands: C,  // 命令列
+    registers: R,     // レジスタの構造体
+    commands: Vec<C>, // 命令列
 }
 
 // マイコン操作の実装
 impl<R, C> Mcu<R, C>
 where
     R: Registers,
-    C: CommandsIterator,
+    C: Command<R>,
 {
     // コンストラクタ
-    fn new(registers: R, commands: C) -> Self {
+    fn new(registers: R, commands: Vec<C>) -> Self {
         Mcu {
             registers,
             commands,
         }
+    }
+}
+
+// マイコン実行の実装
+impl<R, C> Iterator for Mcu<R, C>
+where
+    R: Registers,
+    C: Command<R>,
+{
+    type Item = ();
+    // 次の命令を実行する
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
     }
 }
 
@@ -76,11 +86,6 @@ mod tests {
 
     #[cfg(test)]
     mod trait_command {
-        use super::*;
-    }
-
-    #[cfg(test)]
-    mod trait_commandsiterator {
         use super::*;
     }
 

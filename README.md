@@ -37,21 +37,14 @@ mcugears/               // workspace
 
 ```rust
 struct Mcu{
-    commands: CommandsIterator, // 命令のイテレータ
+    commands: Vec<Command>      // 命令のベクトル
     registers: Registers,       // レジスタの構造体
     //...
 }
 ```
 
-- 命令のイテレータ
-バイナリをパースした命令のイテレータ
-
-```rust
-trait CommandsIterator{/*略*/}
-```
-
 - 命令
-`CommandsIterator`を構成する単一の命令のEnum
+単一の命令のEnum
 
 ```rust
 trait Command{/*略*/}
