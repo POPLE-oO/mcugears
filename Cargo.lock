@@ -5,6 +5,9 @@ version = 4
 [[package]]
 name = "mcugears_atmega328p"
 version = "0.1.0"
+dependencies = [
+ "mcugears_core",
+]
 
 [[package]]
 name = "mcugears_core"
