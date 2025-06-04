@@ -12,7 +12,7 @@ mcugears/               // workspace
 ├── README.md           // ← 現在の場所
 ├── crates
 │   ├── mcugears_core/  // 基本機能
-│   └── mcugears_avr/   // coreを実装しavrアーキテクチャに対応する
+│   └── mcugears_atmega328p/   // coreをatmega328p向けに実装する
 ├── target/
 └── tests/              // 組み合わせテスト
 ```
