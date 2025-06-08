@@ -56,11 +56,12 @@ where
         // 次の命令に副作用があるかで分岐
         // 次の命令取得
         let next_command = &self.commands[next_program_counter as usize];
-        match next_command.command_type() {
-            // 副作用がないなら
-            CommandType::SelfContained => None, // ループ終了
+        if next_command.is_side_effect() {
             // 副作用があるなら
-            CommandType::SideEffect => Some(result.debug_info()), // 次のループ
+            Some(result.debug_info()) // 次のループ
+        } else {
+            // 副作用がないなら
+            None // ループ終了
         }
     }
 
@@ -104,11 +105,12 @@ where
         // 次の命令に副作用があるかで分岐
         // 次の命令取得
         let next_command = &self.commands[next_program_counter as usize];
-        match next_command.command_type() {
-            // 副作用がないなら
-            CommandType::SelfContained => Some(result.debug_info()), // 次のループ
+        if next_command.is_side_effect() {
             // 副作用があるなら
-            CommandType::SideEffect => None, // ループ終了
+            None // ループ終了
+        } else {
+            // 副作用がないなら
+            Some(result.debug_info()) // 次のループ
         }
     }
 }

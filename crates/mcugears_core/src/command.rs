@@ -6,7 +6,7 @@ pub trait Command<R: Registers> {
     // コマンドを実行
     fn run(&self, registers: &mut R) -> CommandResult;
     // 現在のコマンドの種類を取得
-    fn command_type(&self) -> CommandType;
+    fn is_side_effect(&self) -> bool;
 
     // パース時に通常よりも長い命令の場合は先頭に通常のCommand enumを用いる
     // その後の空いたアドレスにはno_operation()を仕込む
@@ -24,10 +24,8 @@ pub trait Command<R: Registers> {
         )
     }
 }
-pub enum CommandType {
-    SelfContained, // 副作用を含まない。 他に影響しない、されない。
-    SideEffect,    // 副作用[IO]
-}
+
+// 命令の実行結果
 pub struct CommandResult {
     debug_info: String,                           // 実行したコマンドの詳細(デバック用)
     clocks: RegisterSize,                         // 実行クロック
@@ -67,27 +65,27 @@ impl CommandResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ExampleCommad::*;
+    use ExampleCommand::*;
 
-    enum ExampleCommad {
+    enum ExampleCommand {
         Add(RegisterId, RegisterId),
     }
 
-    impl<R: Registers> Command<R> for ExampleCommad {
+    impl<R: Registers> Command<R> for ExampleCommand {
         fn run(&self, registers: &mut R) -> CommandResult {
             match self {
                 Self::Add(rd, rr) => Self::add(registers, *rd, *rr),
             }
         }
 
-        fn command_type(&self) -> CommandType {
+        fn is_side_effect(&self) -> bool {
             match self {
-                _ => CommandType::SelfContained,
+                _ => true,
             }
         }
     }
 
-    impl ExampleCommad {
+    impl ExampleCommand {
         pub fn add<R: Registers>(
             registers: &mut R,
             rd: RegisterId,
@@ -106,12 +104,5 @@ mod tests {
 
             CommandResult::new("[ADD]: Rd ← Rd + Rr", 1, ProgramCounterChange::Default)
         }
-    }
-
-    #[test]
-    fn test_command_type_exist() {
-        // 存在するか
-        let _ = CommandType::SelfContained;
-        let _ = CommandType::SideEffect;
     }
 }
