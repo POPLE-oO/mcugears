@@ -70,7 +70,6 @@ pub trait Registers {
 // レジスタの種類
 pub enum RegisterType {
     General { id: RegisterId }, // 汎用レジスタ
-    Uart { id: RegisterId },    // UARTのステータス
     Timer { id: RegisterId },   // タイマー(経過時間)
     ProgramCounter,             // プログラムカウンタ(命令アドレス)
 }

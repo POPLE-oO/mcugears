@@ -1,2 +1,4 @@
 *.code-workspace
 /target
+*.pdf
+private
