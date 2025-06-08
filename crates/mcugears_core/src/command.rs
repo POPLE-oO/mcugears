@@ -67,9 +67,45 @@ impl CommandResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ExampleCommad::*;
 
     enum ExampleCommad {
-        Add(),
+        Add(RegisterId, RegisterId),
+    }
+
+    impl<R: Registers> Command<R> for ExampleCommad {
+        fn run(&self, registers: &mut R) -> CommandResult {
+            match self {
+                Self::Add(rd, rr) => Self::add(registers, *rd, *rr),
+            }
+        }
+
+        fn command_type(&self) -> CommandType {
+            match self {
+                _ => CommandType::SelfContained,
+            }
+        }
+    }
+
+    impl ExampleCommad {
+        pub fn add<R: Registers>(
+            registers: &mut R,
+            rd: RegisterId,
+            rr: RegisterId,
+        ) -> CommandResult {
+            let mut value = 0;
+            registers
+                .operate(&RegisterOperation::Read {
+                    register_type: RegisterType::General { id: rr },
+                    result: &mut value,
+                })
+                .operate(&RegisterOperation::Add {
+                    register_type: RegisterType::General { id: rd },
+                    value,
+                });
+
+            CommandResult::new("[ADD]: Rd ← Rd + Rr", 1, ProgramCounterChange::Default)
+        }
     }
 
     #[test]

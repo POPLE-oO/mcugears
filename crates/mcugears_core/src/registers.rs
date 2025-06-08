@@ -26,7 +26,7 @@ pub trait Registers {
         // 現在のプログラムカウンター取得
         let mut program_counter: RegisterSize = 0;
         let register_operation = RegisterOperation::Read {
-            kind: RegisterType::ProgramCounter,
+            register_type: RegisterType::ProgramCounter,
             result: &mut program_counter,
         };
         self.operate(&register_operation);
@@ -44,19 +44,19 @@ pub trait Registers {
         let register_operation = match program_couter_change {
             // インクリメントで変更(PC←PC+1)
             ProgramCounterChange::Default => RegisterOperation::Add {
-                kind: RegisterType::ProgramCounter,
+                register_type: RegisterType::ProgramCounter,
                 value: 1,
             },
 
             // 相対アドレスで変更
             ProgramCounterChange::Relative(change) => RegisterOperation::Add {
-                kind: RegisterType::ProgramCounter,
+                register_type: RegisterType::ProgramCounter,
                 value: *change,
             },
 
             // 絶対アドレスで変更
             ProgramCounterChange::Absolute(address) => RegisterOperation::Write {
-                kind: RegisterType::ProgramCounter,
+                register_type: RegisterType::ProgramCounter,
                 value: *address,
             },
         };
@@ -77,15 +77,15 @@ pub enum RegisterType {
 // レジスタ操作の種類の列挙型
 pub enum RegisterOperation<'a> {
     Write {
-        kind: RegisterType,
+        register_type: RegisterType,
         value: RegisterSize, // 変更する値
     },
     Add {
-        kind: RegisterType,
+        register_type: RegisterType,
         value: RegisterSize, // 追加する値
     },
     Read {
-        kind: RegisterType,
+        register_type: RegisterType,
         result: &'a mut RegisterSize, // 読み取った結果
     },
     TimerUpdate {
