@@ -35,11 +35,30 @@ pub trait Registers {
         program_counter
     }
     // プログラムカウンター(命令アドレス)を更新して、更新後の値を返す
-    fn update_program_counter(&mut self) -> RegisterSize {
+    fn update_program_counter(
+        &mut self,
+        program_couter_change: &ProgramCounterChange,
+    ) -> RegisterSize {
         // プログラムカウンター更新
-        let register_operation = RegisterOperation::Add {
-            kind: RegisterType::ProgramCounter,
-            value: 1, // 命令ベクトルの添え字を更新
+
+        let register_operation = match program_couter_change {
+            // インクリメントで変更(PC←PC+1)
+            ProgramCounterChange::Default => RegisterOperation::Add {
+                kind: RegisterType::ProgramCounter,
+                value: 1,
+            },
+
+            // 相対アドレスで変更
+            ProgramCounterChange::Relative(change) => RegisterOperation::Add {
+                kind: RegisterType::ProgramCounter,
+                value: *change,
+            },
+
+            // 絶対アドレスで変更
+            ProgramCounterChange::Absolute(address) => RegisterOperation::Write {
+                kind: RegisterType::ProgramCounter,
+                value: *address,
+            },
         };
         self.operate(&register_operation);
 

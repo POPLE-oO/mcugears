@@ -9,7 +9,7 @@ use registers::*;
 
 // 既定の型
 pub type RegisterId = u8; // レジスタのidを格納するための型
-pub type RegisterSize = u64; // レジスタの最大サイズ
+pub type RegisterSize = i64; // レジスタの最大サイズ
 
 // マイコン操作の実体オブジェクト
 struct Mcu<R, C>
@@ -39,8 +39,6 @@ where
     fn run_side_effect(&mut self) -> Option<String> {
         // プログラムカウンター取得
         let current_program_coutnter = self.registers.read_program_counter();
-        // プログラムカウンター取得→更新
-        let next_program_counter = self.registers.update_program_counter();
 
         // 命令取得
         let command = &self.commands[current_program_coutnter as usize];
@@ -49,6 +47,11 @@ where
 
         // タイマーアップデート
         self.registers.update_timer(result.clocks());
+
+        // プログラムカウンター更新
+        let next_program_counter = self
+            .registers
+            .update_program_counter(result.program_couter_change());
 
         // 次の命令に副作用があるかで分岐
         // 次の命令取得
@@ -84,8 +87,6 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         // プログラムカウンター取得
         let current_program_coutnter = self.registers.read_program_counter();
-        // プログラムカウンター更新
-        let next_program_counter = self.registers.update_program_counter();
 
         // 命令取得
         let command = &self.commands[current_program_coutnter as usize];
@@ -94,6 +95,11 @@ where
 
         // タイマーアップデート
         self.registers.update_timer(result.clocks());
+
+        // プログラムカウンター更新
+        let next_program_counter = self
+            .registers
+            .update_program_counter(result.program_couter_change());
 
         // 次の命令に副作用があるかで分岐
         // 次の命令取得
