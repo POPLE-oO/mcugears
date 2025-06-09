@@ -93,11 +93,11 @@ mod tests {
         ) -> CommandResult {
             let mut value = 0;
             registers
-                .operate(&RegisterOperation::Read {
+                .operate(&mut RegisterOperation::Read {
                     register_type: RegisterType::General { id: rr },
                     result: &mut value,
                 })
-                .operate(&RegisterOperation::Add {
+                .operate(&mut RegisterOperation::Add {
                     register_type: RegisterType::General { id: rd },
                     value,
                 });
