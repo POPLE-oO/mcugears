@@ -12,13 +12,14 @@ pub type RegisterId = u8; // レジスタのidを格納するための型
 pub type RegisterSize = i64; // レジスタの最大サイズ
 
 // マイコン操作の実体オブジェクト
-struct Mcu<R, C>
+pub struct Mcu<R, C>
 where
     R: Registers,
     C: Command<R>,
 {
-    registers: R,     // レジスタの構造体
-    commands: Vec<C>, // 命令列
+    registers: R,                      // レジスタの構造体
+    commands: Vec<C>,                  // 命令列
+    elapsed_clocks: Vec<RegisterSize>, // タイマーのカウントアップからの経過時間(プリスケーラ用)
 }
 
 // マイコン操作の実装
@@ -29,9 +30,11 @@ where
 {
     // コンストラクタ
     fn new(registers: R, commands: Vec<C>) -> Self {
+        let timer_num = registers.get_register_num(&RegisterType::Timer { id: 0 }) as usize;
         Mcu {
             registers,
             commands,
+            elapsed_clocks: vec![0; timer_num],
         }
     }
 
@@ -46,7 +49,8 @@ where
         let result = command.run(&mut self.registers);
 
         // タイマーアップデート
-        self.registers.update_timer(result.clocks());
+        self.registers
+            .update_timer(&mut self.elapsed_clocks, result.clocks());
 
         // プログラムカウンター更新
         let next_program_counter = self
@@ -95,7 +99,8 @@ where
         let result = command.run(&mut self.registers);
 
         // タイマーアップデート
-        self.registers.update_timer(result.clocks());
+        self.registers
+            .update_timer(&mut self.elapsed_clocks, result.clocks());
 
         // プログラムカウンター更新
         let next_program_counter = self

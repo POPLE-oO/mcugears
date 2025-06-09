@@ -29,13 +29,6 @@ pub trait Registers {
                 register_type,
                 result,
             } => **result = self.get_register(register_type),
-
-            RegisterOperation::TimerUpdate { clocks } => {
-                self.operate(&mut RegisterOperation::Add {
-                    register_type: RegisterType::Timer { id: 0 },
-                    value: *clocks,
-                });
-            }
         };
 
         self
@@ -48,13 +41,11 @@ pub trait Registers {
     }
 
     // タイマーを更新
-    fn update_timer(&mut self, clocks: RegisterSize) -> &mut Self {
-        let operation = &mut RegisterOperation::TimerUpdate { clocks };
-
-        self.operate(operation);
-
-        self
-    }
+    fn update_timer(
+        &mut self,
+        elapsed_clocks: &mut Vec<RegisterSize>,
+        clocks: RegisterSize,
+    ) -> &mut Self;
 
     // プログラムカウンター(命令アドレス)の値を返す
     fn read_program_counter(&mut self) -> RegisterSize {
@@ -123,10 +114,6 @@ pub enum RegisterOperation<'a> {
         register_type: RegisterType,
         result: &'a mut RegisterSize, // 読み取った結果
     },
-    TimerUpdate {
-        // すべてのタイマーを指定したクロック数で更新する
-        clocks: RegisterSize, // クロック数
-    },
 }
 
 #[cfg(test)]
@@ -136,7 +123,7 @@ mod tests {
     #[derive(Debug, PartialEq)]
     struct ExampleRegisters {
         general: [u8; 32],
-        timer: [u16; 1],
+        timer: [u8; 1],
         program_counter: u16,
     }
     impl Registers for ExampleRegisters {
@@ -151,7 +138,7 @@ mod tests {
         fn set_register(&mut self, register_type: &RegisterType, value: RegisterSize) {
             match register_type {
                 RegisterType::General { id } => self.general[*id as usize] = value as u8,
-                RegisterType::Timer { id } => self.timer[*id as usize] = value as u16,
+                RegisterType::Timer { id } => self.timer[*id as usize] = value as u8,
                 RegisterType::ProgramCounter => self.program_counter = value as u16,
             }
         }
@@ -163,12 +150,40 @@ mod tests {
                 RegisterType::ProgramCounter => self.program_counter as RegisterSize,
             }
         }
+
         fn get_register_num(&self, register_type: &RegisterType) -> RegisterId {
             match register_type {
                 RegisterType::General { id: _ } => 32,
                 RegisterType::Timer { id: _ } => 1,
                 RegisterType::ProgramCounter => 1,
             }
+        }
+
+        fn update_timer(
+            &mut self,
+            elapsed_clocks: &mut Vec<RegisterSize>,
+            clocks: RegisterSize,
+        ) -> &mut Self {
+            // プリスケーラ定義(仮)
+            let prescalers = [64];
+
+            for (id, elapsed_clocks_item) in elapsed_clocks.iter_mut().enumerate() {
+                // 経過時間追加
+                *elapsed_clocks_item += clocks;
+
+                // プリスケーラ
+                self.operate(&mut RegisterOperation::Add {
+                    register_type: RegisterType::Timer {
+                        id: id as RegisterId,
+                    },
+                    value: *elapsed_clocks_item / prescalers[id], // プリスケーラの閾値を超えたらタイマーをカウントアップ
+                });
+
+                // プリスケーラの起動しない部分は経過時間として保存しておく
+                *elapsed_clocks_item %= prescalers[id];
+            }
+
+            self
         }
     }
 
@@ -221,4 +236,5 @@ mod tests {
     // get_register_num
     // エッジケース
     // 無効なID
+    // パフォーマンス計測
 }
