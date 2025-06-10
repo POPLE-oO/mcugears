@@ -23,7 +23,10 @@ pub trait Registers {
             RegisterOperation::Add {
                 register_type,
                 value,
-            } => self.set_register(register_type, self.get_register(register_type) + *value),
+            } => self.set_register(
+                register_type,
+                self.get_register(register_type).wrapping_add(*value),
+            ),
 
             RegisterOperation::Read {
                 register_type,
@@ -96,6 +99,7 @@ pub trait Registers {
 }
 
 // レジスタの種類
+#[derive(Debug, Clone, Copy)]
 pub enum RegisterType {
     General { id: RegisterId }, // 汎用レジスタ
     Timer { id: RegisterId },   // タイマー(経過時間)
@@ -103,6 +107,7 @@ pub enum RegisterType {
 }
 
 // レジスタ操作の種類の列挙型
+#[derive(Debug)]
 pub enum RegisterOperation<'a> {
     Write {
         register_type: RegisterType,
@@ -314,7 +319,28 @@ mod tests {
     }
 
     // operate_batch
-    fn test_operate_batch() {}
+    fn test_operate_batch() {
+        let mut registers = ExampleRegisters::new();
+
+        let register_type = RegisterType::General { id: 15 };
+        let mut result = 0;
+
+        registers.operate_batch(vec![
+            &mut RegisterOperation::Write {
+                register_type,
+                value: 12,
+            },
+            &mut RegisterOperation::Add {
+                register_type,
+                value: 120,
+            },
+            &mut RegisterOperation::Read {
+                register_type,
+                result: &mut result,
+            },
+        ]);
+        assert_eq!(result, 132);
+    }
     // update_timer
     // read_program_counter
     // update_program_counter
