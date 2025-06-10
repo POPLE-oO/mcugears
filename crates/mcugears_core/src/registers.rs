@@ -226,9 +226,39 @@ mod tests {
 
     // set_register, get_registerの切り捨て処理
     #[test]
-    fn test_set_get_register_truncation_general() {}
+    fn test_set_get_register_truncation_general() {
+        let mut registers = ExampleRegisters::new();
+        let register_type = &RegisterType::General { id: 3 };
+        registers.set_register(register_type, 265);
+
+        assert_eq!(registers.get_register(register_type), 9);
+    }
+
+    #[test]
+    fn test_set_get_register_truncation_timer() {
+        let mut registers = ExampleRegisters::new();
+        let register_type = &RegisterType::Timer { id: 0 };
+        registers.set_register(register_type, 5000);
+
+        assert_eq!(registers.get_register(register_type), 136);
+    }
+
+    #[test]
+    fn test_set_get_register_truncation_program_counter() {
+        let mut registers = ExampleRegisters::new();
+        let register_type = &RegisterType::ProgramCounter;
+        registers.set_register(register_type, 67056);
+
+        assert_eq!(registers.get_register(register_type), 1520);
+    }
 
     // operate
+    #[test]
+    fn test_operate_write() {}
+    #[test]
+    fn test_operate_add() {}
+    #[test]
+    fn test_operate_read() {}
     // operate_batch
     // update_timer
     // read_program_counter
