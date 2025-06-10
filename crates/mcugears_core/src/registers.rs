@@ -194,152 +194,168 @@ mod tests {
         }
     }
 
-    //new
-    #[test]
-    fn test_new() {
-        let registers = ExampleRegisters::new();
-        assert_eq!(registers.general, [0; 32]);
-        assert_eq!(registers.timer, [0; 1]);
-        assert_eq!(registers.program_counter, 0);
+    // Registers生成に関するテスト
+    #[cfg(test)]
+    mod test_registers_new {
+        use super::*;
+        //new
+        #[test]
+        fn test_new() {
+            let registers = ExampleRegisters::new();
+            assert_eq!(registers.general, [0; 32]);
+            assert_eq!(registers.timer, [0; 1]);
+            assert_eq!(registers.program_counter, 0);
+        }
     }
 
-    // set_register, get_register
-    #[test]
-    fn test_set_get_register_general() {
-        let mut registers = ExampleRegisters::new();
-        let register_type = &RegisterType::General { id: 4 };
-        registers.set_register(register_type, 42);
+    // Registersの値の読み書きに関するテスト
+    #[cfg(test)]
+    mod test_registers_access {
+        use super::*;
 
-        assert_eq!(registers.get_register(register_type), 42);
+        // set_register, get_register
+        #[test]
+        fn test_set_get_register_general() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = &RegisterType::General { id: 4 };
+            registers.set_register(register_type, 42);
+
+            assert_eq!(registers.get_register(register_type), 42);
+        }
+
+        #[test]
+        fn test_set_get_register_timer() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = &RegisterType::Timer { id: 0 };
+            registers.set_register(register_type, 211);
+
+            assert_eq!(registers.get_register(register_type), 211);
+        }
+
+        #[test]
+        fn test_set_get_register_program_counter() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = &RegisterType::ProgramCounter;
+            registers.set_register(register_type, 101);
+
+            assert_eq!(registers.get_register(register_type), 101);
+        }
+
+        // set_register, get_registerの切り捨て処理
+        #[test]
+        fn test_set_get_register_truncation_general() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = &RegisterType::General { id: 3 };
+            registers.set_register(register_type, 265);
+
+            assert_eq!(registers.get_register(register_type), 9);
+        }
+
+        #[test]
+        fn test_set_get_register_truncation_timer() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = &RegisterType::Timer { id: 0 };
+            registers.set_register(register_type, 5000);
+
+            assert_eq!(registers.get_register(register_type), 136);
+        }
+
+        #[test]
+        fn test_set_get_register_truncation_program_counter() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = &RegisterType::ProgramCounter;
+            registers.set_register(register_type, 67056);
+
+            assert_eq!(registers.get_register(register_type), 1520);
+        }
+
+        // get_registerへ負の値の代入
+        #[test]
+        fn test_set_get_register_negative_value_general() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = &RegisterType::General { id: 3 };
+            registers.set_register(register_type, -13);
+
+            assert_eq!(registers.get_register(register_type), 243);
+        }
     }
 
-    #[test]
-    fn test_set_get_register_timer() {
-        let mut registers = ExampleRegisters::new();
-        let register_type = &RegisterType::Timer { id: 0 };
-        registers.set_register(register_type, 211);
+    // RegisterOperation Enumと組み合わせたレジスタ操作
+    #[cfg(test)]
+    mod test_registers_operate {
+        use super::*;
+        // operate
+        #[test]
+        fn test_operate_write() {
+            let mut registers = ExampleRegisters::new();
 
-        assert_eq!(registers.get_register(register_type), 211);
-    }
+            let operation = &mut RegisterOperation::Add {
+                register_type: RegisterType::General { id: 2 },
+                value: 5,
+            };
+            registers.operate(operation);
 
-    #[test]
-    fn test_set_get_register_program_counter() {
-        let mut registers = ExampleRegisters::new();
-        let register_type = &RegisterType::ProgramCounter;
-        registers.set_register(register_type, 101);
+            assert_eq!(registers.get_register(&RegisterType::General { id: 2 }), 5);
+        }
 
-        assert_eq!(registers.get_register(register_type), 101);
-    }
+        #[test]
+        fn test_operate_add() {
+            let mut registers = ExampleRegisters::new();
 
-    // set_register, get_registerの切り捨て処理
-    #[test]
-    fn test_set_get_register_truncation_general() {
-        let mut registers = ExampleRegisters::new();
-        let register_type = &RegisterType::General { id: 3 };
-        registers.set_register(register_type, 265);
+            let operation = &mut RegisterOperation::Add {
+                register_type: RegisterType::General { id: 10 },
+                value: 100,
+            };
+            registers.operate(operation);
 
-        assert_eq!(registers.get_register(register_type), 9);
-    }
+            assert_eq!(
+                registers.get_register(&RegisterType::General { id: 10 }),
+                100
+            );
+        }
 
-    #[test]
-    fn test_set_get_register_truncation_timer() {
-        let mut registers = ExampleRegisters::new();
-        let register_type = &RegisterType::Timer { id: 0 };
-        registers.set_register(register_type, 5000);
+        #[test]
+        fn test_operate_read() {
+            let mut registers = ExampleRegisters::new();
+            let operation = &mut RegisterOperation::Add {
+                register_type: RegisterType::General { id: 3 },
+                value: 3,
+            };
+            registers.operate(operation);
 
-        assert_eq!(registers.get_register(register_type), 136);
-    }
-
-    #[test]
-    fn test_set_get_register_truncation_program_counter() {
-        let mut registers = ExampleRegisters::new();
-        let register_type = &RegisterType::ProgramCounter;
-        registers.set_register(register_type, 67056);
-
-        assert_eq!(registers.get_register(register_type), 1520);
-    }
-
-    // get_registerへ負の値の代入
-    #[test]
-    fn test_set_get_register_negative_value_general() {
-        let mut registers = ExampleRegisters::new();
-        let register_type = &RegisterType::General { id: 3 };
-        registers.set_register(register_type, -13);
-
-        assert_eq!(registers.get_register(register_type), 243);
-    }
-
-    // operate
-    #[test]
-    fn test_operate_write() {
-        let mut registers = ExampleRegisters::new();
-
-        let operation = &mut RegisterOperation::Add {
-            register_type: RegisterType::General { id: 2 },
-            value: 5,
-        };
-        registers.operate(operation);
-
-        assert_eq!(registers.get_register(&RegisterType::General { id: 2 }), 5);
-    }
-
-    #[test]
-    fn test_operate_add() {
-        let mut registers = ExampleRegisters::new();
-
-        let operation = &mut RegisterOperation::Add {
-            register_type: RegisterType::General { id: 10 },
-            value: 100,
-        };
-        registers.operate(operation);
-
-        assert_eq!(
-            registers.get_register(&RegisterType::General { id: 10 }),
-            100
-        );
-    }
-
-    #[test]
-    fn test_operate_read() {
-        let mut registers = ExampleRegisters::new();
-        let operation = &mut RegisterOperation::Add {
-            register_type: RegisterType::General { id: 3 },
-            value: 3,
-        };
-        registers.operate(operation);
-
-        let mut result = 0;
-        let operation = &mut RegisterOperation::Read {
-            register_type: RegisterType::General { id: 3 },
-            result: &mut result,
-        };
-        registers.operate(operation);
-
-        assert_eq!(result, 3);
-    }
-
-    // operate_batch
-    fn test_operate_batch() {
-        let mut registers = ExampleRegisters::new();
-
-        let register_type = RegisterType::General { id: 15 };
-        let mut result = 0;
-
-        registers.operate_batch(vec![
-            &mut RegisterOperation::Write {
-                register_type,
-                value: 12,
-            },
-            &mut RegisterOperation::Add {
-                register_type,
-                value: 120,
-            },
-            &mut RegisterOperation::Read {
-                register_type,
+            let mut result = 0;
+            let operation = &mut RegisterOperation::Read {
+                register_type: RegisterType::General { id: 3 },
                 result: &mut result,
-            },
-        ]);
-        assert_eq!(result, 132);
+            };
+            registers.operate(operation);
+
+            assert_eq!(result, 3);
+        }
+
+        // operate_batch
+        fn test_operate_batch() {
+            let mut registers = ExampleRegisters::new();
+
+            let register_type = RegisterType::General { id: 15 };
+            let mut result = 0;
+
+            registers.operate_batch(vec![
+                &mut RegisterOperation::Write {
+                    register_type,
+                    value: 12,
+                },
+                &mut RegisterOperation::Add {
+                    register_type,
+                    value: 120,
+                },
+                &mut RegisterOperation::Read {
+                    register_type,
+                    result: &mut result,
+                },
+            ]);
+            assert_eq!(result, 132);
+        }
     }
     // update_timer
     // read_program_counter
