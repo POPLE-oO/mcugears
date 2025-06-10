@@ -33,6 +33,7 @@ pub trait Registers {
 
         self
     }
+
     // 処理を複数受け取ってイテレータで処理する
     fn operate_batch(&mut self, operations: Vec<&mut RegisterOperation>) {
         for operation in operations {
@@ -60,6 +61,7 @@ pub trait Registers {
         // 現在の値を返す
         program_counter
     }
+
     // プログラムカウンター(命令アドレス)を更新して、更新後の値を返す
     fn update_program_counter(
         &mut self,
@@ -252,14 +254,67 @@ mod tests {
         assert_eq!(registers.get_register(register_type), 1520);
     }
 
+    // get_registerへ負の値の代入
+    #[test]
+    fn test_set_get_register_negative_value_general() {
+        let mut registers = ExampleRegisters::new();
+        let register_type = &RegisterType::General { id: 3 };
+        registers.set_register(register_type, -13);
+
+        assert_eq!(registers.get_register(register_type), 243);
+    }
+
     // operate
     #[test]
-    fn test_operate_write() {}
+    fn test_operate_write() {
+        let mut registers = ExampleRegisters::new();
+
+        let operation = &mut RegisterOperation::Add {
+            register_type: RegisterType::General { id: 2 },
+            value: 5,
+        };
+        registers.operate(operation);
+
+        assert_eq!(registers.get_register(&RegisterType::General { id: 2 }), 5);
+    }
+
     #[test]
-    fn test_operate_add() {}
+    fn test_operate_add() {
+        let mut registers = ExampleRegisters::new();
+
+        let operation = &mut RegisterOperation::Add {
+            register_type: RegisterType::General { id: 10 },
+            value: 100,
+        };
+        registers.operate(operation);
+
+        assert_eq!(
+            registers.get_register(&RegisterType::General { id: 10 }),
+            100
+        );
+    }
+
     #[test]
-    fn test_operate_read() {}
+    fn test_operate_read() {
+        let mut registers = ExampleRegisters::new();
+        let operation = &mut RegisterOperation::Add {
+            register_type: RegisterType::General { id: 3 },
+            value: 3,
+        };
+        registers.operate(operation);
+
+        let mut result = 0;
+        let operation = &mut RegisterOperation::Read {
+            register_type: RegisterType::General { id: 3 },
+            result: &mut result,
+        };
+        registers.operate(operation);
+
+        assert_eq!(result, 3);
+    }
+
     // operate_batch
+    fn test_operate_batch() {}
     // update_timer
     // read_program_counter
     // update_program_counter
