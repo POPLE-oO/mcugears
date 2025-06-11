@@ -434,9 +434,42 @@ mod tests {
         }
     }
 
-    // --- read_program_counter ---
-    // --- update_program_counter ---
-    // --- read_register_count ---
+    // --- read_program_counter, update_program_counterのテスト ---
+    #[cfg(test)]
+    mod test_registers_read_program_counter {
+        use super::*;
+
+        // ---  read_program_counterのテスト  ---
+        // PCの絶対的なupdateとそのread,
+        #[test]
+        fn test_read_update_program_counter_absolute() {
+            let mut registers = ExampleRegisters::new();
+            registers.update_program_counter(ProgramCounterChange::Absolute(121));
+
+            assert_eq!(registers.read_program_counter(), 121);
+        }
+
+        // PCのデフォルトのread,update
+        #[test]
+        fn test_read_update_program_counter_default() {
+            let mut registers = ExampleRegisters::new();
+            registers.update_program_counter(ProgramCounterChange::Absolute(30));
+            registers.update_program_counter(ProgramCounterChange::Default);
+
+            assert_eq!(registers.read_program_counter(), 31);
+        }
+
+        // PCの相対的なupdateとそのread,
+        #[test]
+        fn test_read_update_program_counter_relative() {
+            let mut registers = ExampleRegisters::new();
+            registers.update_program_counter(ProgramCounterChange::Absolute(30));
+            registers.update_program_counter(ProgramCounterChange::Relative(3));
+
+            assert_eq!(registers.read_program_counter(), 33);
+        }
+    }
+
     // --- エッジケース ---
     // --- 無効なID ---
     // --- パフォーマンス計測 ---
