@@ -66,6 +66,7 @@ impl CommandResult {
 mod tests {
     use super::*;
     use ExampleCommand::*;
+    use registers::test_utilities::*;
 
     enum ExampleCommand {
         Add(RegisterId, RegisterId),
