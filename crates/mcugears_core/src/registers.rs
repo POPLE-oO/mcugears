@@ -205,7 +205,7 @@ mod tests {
         // ---  read_register_count  ---
         // generalのcount
         #[test]
-        fn test_read_register_num_general() {
+        fn test_read_register_count_general() {
             let registers = ExampleRegisters::new();
             assert_eq!(
                 registers.read_register_count(RegisterType::General { id: 0 }),
@@ -215,7 +215,7 @@ mod tests {
 
         // timerのcount
         #[test]
-        fn test_read_register_num_timer() {
+        fn test_read_register_count_timer() {
             let registers = ExampleRegisters::new();
             assert_eq!(
                 registers.read_register_count(RegisterType::Timer { id: 0 }),
@@ -225,7 +225,7 @@ mod tests {
 
         // program_counterのcount
         #[test]
-        fn test_read_register_num_program_counter() {
+        fn test_read_register_count_program_counter() {
             let registers = ExampleRegisters::new();
             assert_eq!(
                 registers.read_register_count(RegisterType::ProgramCounter),
@@ -396,8 +396,44 @@ mod tests {
         // ---  update_timerのテスト  ---
         // update_timerの実行
         #[test]
-        fn test_update_timer() {}
+        fn test_update_timer() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::Timer { id: 0 };
+
+            let mut elapsed_clocks_from_timer_update = vec![0];
+            registers.update_timer(&mut elapsed_clocks_from_timer_update, 100);
+
+            assert_eq!(registers.read_register_value(register_type), 1);
+        }
+
+        // update_timerが何度も実行されたとき
+        #[test]
+        fn test_update_timer_repeatedly() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::Timer { id: 0 };
+
+            let mut elapsed_clocks_from_timer_update = vec![0];
+            for i in 0..50 {
+                registers.update_timer(&mut elapsed_clocks_from_timer_update, 2);
+            }
+            assert_eq!(registers.read_register_value(register_type), 1);
+        }
+
+        // ---  elapsed_clocks_from_timer_updateとprescalerの動作確認 ---
+        // prescalerが起動しないとき
+        // (elapsed_clocks_from_timer_update < prescalerの時)
+        #[test]
+        fn test_update_timer_prescaler_not_activated() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::Timer { id: 0 };
+
+            let mut elapsed_clocks_from_timer_update = vec![0];
+            registers.update_timer(&mut elapsed_clocks_from_timer_update, 1);
+
+            assert_eq!(registers.read_register_value(register_type), 0);
+        }
     }
+
     // --- read_program_counter ---
     // --- update_program_counter ---
     // --- read_register_count ---
