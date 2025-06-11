@@ -26,6 +26,7 @@ pub trait Command<R: Registers> {
 }
 
 // 命令の実行結果
+#[derive(Debug)]
 pub struct CommandResult {
     debug_info: String,                           // 実行したコマンドの詳細(デバック用)
     clocks: RegisterSize,                         // 実行クロック
@@ -58,8 +59,8 @@ impl CommandResult {
     pub fn clocks(&self) -> RegisterSize {
         self.clocks
     }
-    pub fn program_couter_change(&self) -> &ProgramCounterChange {
-        &self.program_counter_change
+    pub fn program_couter_change(&self) -> ProgramCounterChange {
+        self.program_counter_change
     }
 }
 

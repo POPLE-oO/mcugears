@@ -5,14 +5,14 @@ use crate::*;
 pub trait Registers {
     // コンストラクタ
     fn new() -> Self;
-    // 可変参照取得
+    // 値の設定
     fn set_register(&mut self, register_type: RegisterType, value: RegisterSize);
     // 値取得
     fn read_register_value(&self, register_type: RegisterType) -> RegisterSize;
     // レジスタの数を取得
     fn read_register_count(&self, register_type: RegisterType) -> RegisterId;
 
-    // レジスタの種類、値などを受け取って変更したりする
+    // レジスタの変更操作を受け取り変更をする
     fn execute_operation(&mut self, operation: RegisterOperation) -> &mut Self {
         match operation {
             RegisterOperation::Write {
@@ -42,7 +42,7 @@ pub trait Registers {
     // タイマーを更新
     fn update_timer(
         &mut self,
-        elapsed_clocks: &mut Vec<RegisterSize>,
+        elapsed_clocks_from_timer_update: &mut Vec<RegisterSize>,
         clocks: RegisterSize,
     ) -> &mut Self;
 
@@ -55,7 +55,7 @@ pub trait Registers {
     // プログラムカウンター(命令アドレス)を更新して、更新後の値を返す
     fn update_program_counter(
         &mut self,
-        program_couter_change: &ProgramCounterChange,
+        program_couter_change: ProgramCounterChange,
     ) -> RegisterSize {
         // プログラムカウンター更新
 
@@ -69,13 +69,13 @@ pub trait Registers {
             // 相対アドレスで変更
             ProgramCounterChange::Relative(change) => RegisterOperation::Add {
                 register_type: RegisterType::ProgramCounter,
-                value: *change,
+                value: change,
             },
 
             // 絶対アドレスで変更
             ProgramCounterChange::Absolute(address) => RegisterOperation::Write {
                 register_type: RegisterType::ProgramCounter,
-                value: *address,
+                value: address,
             },
         };
         self.execute_operation(register_operation);
@@ -152,26 +152,26 @@ pub mod test_utilities {
 
         fn update_timer(
             &mut self,
-            elapsed_clocks: &mut Vec<RegisterSize>,
+            elapsed_clocks_from_timer_update: &mut Vec<RegisterSize>,
             clocks: RegisterSize,
         ) -> &mut Self {
             // プリスケーラ定義(仮)
             let prescalers = [64];
 
-            for (id, elapsed_clocks_item) in elapsed_clocks.iter_mut().enumerate() {
+            for (id, elapsed_clocks) in elapsed_clocks_from_timer_update.iter_mut().enumerate() {
                 // 経過時間追加
-                *elapsed_clocks_item += clocks;
+                *elapsed_clocks += clocks;
 
                 // プリスケーラ
                 self.execute_operation(RegisterOperation::Add {
                     register_type: RegisterType::Timer {
                         id: id as RegisterId,
                     },
-                    value: *elapsed_clocks_item / prescalers[id], // プリスケーラの閾値を超えたらタイマーをカウントアップ
+                    value: *elapsed_clocks / prescalers[id], // プリスケーラの閾値を超えたらタイマーをアップデート
                 });
 
                 // プリスケーラの起動しない部分は経過時間として保存しておく
-                *elapsed_clocks_item %= prescalers[id];
+                *elapsed_clocks %= prescalers[id];
             }
 
             self
@@ -182,7 +182,7 @@ pub mod test_utilities {
     #[cfg(test)]
     mod tests {
         use super::*;
-        //new
+        // new関数
         #[test]
         fn test_new() {
             let registers = ExampleRegisters::new();
@@ -198,15 +198,40 @@ mod tests {
     use super::test_utilities::*;
     use super::*;
 
-    // ---  Registersの値の読み込みテスト  ---
+    // ---  Registersの読み書きテスト  ---
     #[cfg(test)]
-    mod test_registers_read {
+    mod test_registers_set_read {
         use super::*;
-    }
-    // ---  Registersの値の書き込みテスト  ---
-    #[cfg(test)]
-    mod test_registers_set {
-        use super::*;
+        // ---  read_register_count  ---
+        // generalのcount
+        #[test]
+        fn test_read_register_num_general() {
+            let registers = ExampleRegisters::new();
+            assert_eq!(
+                registers.read_register_count(RegisterType::General { id: 0 }),
+                32
+            );
+        }
+
+        // timerのcount
+        #[test]
+        fn test_read_register_num_timer() {
+            let registers = ExampleRegisters::new();
+            assert_eq!(
+                registers.read_register_count(RegisterType::Timer { id: 0 }),
+                1
+            );
+        }
+
+        // program_counterのcount
+        #[test]
+        fn test_read_register_num_program_counter() {
+            let registers = ExampleRegisters::new();
+            assert_eq!(
+                registers.read_register_count(RegisterType::ProgramCounter),
+                1
+            );
+        }
 
         // --- set_register, read_register_valueのテスト---
         // register.generalのset,read
@@ -280,14 +305,34 @@ mod tests {
 
             assert_eq!(registers.read_register_value(register_type), 243);
         }
+
+        // timerへの負の値代入
+        #[test]
+        fn test_set_register_negative_value_timer() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::Timer { id: 0 };
+            registers.set_register(register_type, -13);
+
+            assert_eq!(registers.read_register_value(register_type), 243);
+        }
+
+        // program_couterへの負の値代入
+        #[test]
+        fn test_set_register_negative_value_program_counter() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::ProgramCounter;
+            registers.set_register(register_type, -13);
+
+            assert_eq!(registers.read_register_value(register_type), 65523);
+        }
     }
 
     // ---  Enum RegisterOperation を使用したレジスタ操作  ---
     #[cfg(test)]
-    mod test_registers_operate {
+    mod test_registers_execute_operation {
         use super::*;
         // ---  execute_operationのテスト  ---
-        // writeをoperateで実行する
+        // writeをexecute_operationで実行する
         #[test]
         fn test_execute_operation_write() {
             let mut registers = ExampleRegisters::new();
@@ -304,7 +349,7 @@ mod tests {
             );
         }
 
-        // addをoperateで実行する
+        // addをexecute_operationで実行する
         #[test]
         fn test_execute_operation_add() {
             let mut registers = ExampleRegisters::new();
@@ -321,22 +366,9 @@ mod tests {
             );
         }
 
-        // readをoperateで実行する
+        // --- execute_operation_batchのテスト  ---
+        // execute_operation_batch実行
         #[test]
-        fn test_operate_read() {
-            let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::General { id: 3 };
-            let operation = RegisterOperation::Add {
-                register_type,
-                value: 3,
-            };
-            registers.execute_operation(operation);
-
-            assert_eq!(registers.read_register_value(register_type), 3,);
-        }
-
-        // --- operate_batchのテスト  ---
-        // operate_batch実行
         fn test_execute_operation_batch() {
             let mut registers = ExampleRegisters::new();
 
