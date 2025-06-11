@@ -30,7 +30,7 @@ where
 {
     // コンストラクタ
     fn new(registers: R, commands: Vec<C>) -> Self {
-        let timer_num = registers.get_register_num(&RegisterType::Timer { id: 0 }) as usize;
+        let timer_num = registers.read_register_count(RegisterType::Timer { id: 0 }) as usize;
         Mcu {
             registers,
             commands,

@@ -33,6 +33,7 @@ pub struct CommandResult {
 }
 
 // プログラムカウンター(命令アドレス)の更新方法
+#[derive(Debug, Clone, Copy)]
 pub enum ProgramCounterChange {
     Default,                // PCをインクリメント(PC←PC+1)
     Absolute(RegisterSize), // 絶対アドレス(直接目標のアドレスへ)
@@ -92,16 +93,10 @@ mod tests {
             rd: RegisterId,
             rr: RegisterId,
         ) -> CommandResult {
-            let mut value = 0;
-            registers
-                .operate(&mut RegisterOperation::Read {
-                    register_type: RegisterType::General { id: rr },
-                    result: &mut value,
-                })
-                .operate(&mut RegisterOperation::Add {
-                    register_type: RegisterType::General { id: rd },
-                    value,
-                });
+            registers.execute_operation(RegisterOperation::Add {
+                register_type: RegisterType::General { id: rd },
+                value: registers.read_register_value(RegisterType::General { id: rr }),
+            });
 
             CommandResult::new("[ADD]: Rd ← Rd + Rr", 1, ProgramCounterChange::Default)
         }
