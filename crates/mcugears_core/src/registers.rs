@@ -413,7 +413,7 @@ mod tests {
             let register_type = RegisterType::Timer { id: 0 };
 
             let mut elapsed_clocks_from_timer_update = vec![0];
-            for i in 0..50 {
+            for _ in 0..50 {
                 registers.update_timer(&mut elapsed_clocks_from_timer_update, 2);
             }
             assert_eq!(registers.read_register_value(register_type), 1);
@@ -470,7 +470,95 @@ mod tests {
         }
     }
 
-    // --- エッジケース ---
-    // --- 無効なID ---
     // --- パフォーマンス計測 ---
+    #[cfg(test)]
+    mod benchmarks {
+        use super::*;
+        use std::time::Duration;
+        use std::time::Instant;
+
+        // 対応する最大のクロック周波数[16MHz]
+        const MAX_CLOCKS_FREQUENCY: usize = 16e6 as usize;
+        // 1commandあたりのoperation数[operations/command]
+        const OPERATIONS_IN_ONE_COMMAND: usize = 6;
+
+        // --- execute_opeartionのパフォーマンス計測 ---
+        // writeのパフォーマンス
+        #[test]
+        #[ignore]
+        fn test_execute_operation_performance_write() {
+            let mut registers = ExampleRegisters::new();
+
+            // 適当な値でoperationsを生成
+            // (周波数)*(1 commandのoperation数)で1秒あたりのoperation数[1operations/s]
+            let operations: Vec<RegisterOperation> =
+                std::iter::repeat_with(|| RegisterOperation::Write {
+                    register_type: RegisterType::General {
+                        id: rand::random_range(0..32),
+                    },
+                    value: rand::random_range(0..100),
+                })
+                .take(MAX_CLOCKS_FREQUENCY * OPERATIONS_IN_ONE_COMMAND)
+                .collect();
+
+            // 計測開始
+            let start = Instant::now();
+            // operationsを実行
+            registers.execute_operation_batch(&operations);
+            // 計測終了
+            let elapsed = start.elapsed();
+
+            // ベンチ結果
+            // 実行数
+            println!(
+                "[DONE]:operations/seconds: {}",
+                MAX_CLOCKS_FREQUENCY * OPERATIONS_IN_ONE_COMMAND
+            );
+            // 実行結果
+            println!("[RESULT]registers: {registers:?}");
+            // パフォーマンス
+            println!("[PERFORMANCE]execute_operation_batch: {elapsed:?}/1000.00ms");
+            // 1秒に収まっているか
+            assert!(elapsed < Duration::new(1, 0));
+        }
+
+        // addのパフォーマンス
+        #[test]
+        #[ignore]
+        fn test_execute_operation_performance_add() {
+            let mut registers = ExampleRegisters::new();
+
+            // 適当な値でoperationsを生成
+            // (周波数)*(1 commandのoperation数)で1秒あたりのoperation数[1operations/s]
+            let operations: Vec<RegisterOperation> =
+                std::iter::repeat_with(|| RegisterOperation::Add {
+                    register_type: RegisterType::General {
+                        id: rand::random_range(0..32),
+                    },
+                    value: rand::random_range(0..100),
+                })
+                .take(MAX_CLOCKS_FREQUENCY * OPERATIONS_IN_ONE_COMMAND)
+                .collect();
+
+            // 計測開始
+            let start = Instant::now();
+            // operationsを実行
+            registers.execute_operation_batch(&operations);
+            // 計測終了
+            let elapsed = start.elapsed();
+
+            // ベンチ結果
+            // 実行数
+            println!(
+                "[DONE]:operations/seconds: {}",
+                MAX_CLOCKS_FREQUENCY * OPERATIONS_IN_ONE_COMMAND
+            );
+            // 実行結果
+            println!("[RESULT]registers: {registers:?}");
+            // パフォーマンス
+            println!("[PERFORMANCE]execute_operation_batch: {elapsed:?}/1000.00ms");
+            // 1秒に収まっているか
+            assert!(elapsed < Duration::new(1, 0));
+        }
+    }
 }
