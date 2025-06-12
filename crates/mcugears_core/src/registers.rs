@@ -19,7 +19,6 @@ pub trait Registers {
                 register_type,
                 value,
             } => self.set_register(register_type, value),
-
             RegisterOperation::Add {
                 register_type,
                 value,
@@ -27,6 +26,7 @@ pub trait Registers {
                 register_type,
                 self.read_register_value(register_type).wrapping_add(value),
             ),
+            RegisterOperation::None => {}
         };
 
         self
@@ -60,23 +60,19 @@ pub trait Registers {
         // プログラムカウンター更新
 
         let register_operation = match program_couter_change {
-            // インクリメントで変更(PC←PC+1)
             ProgramCounterChange::Default => RegisterOperation::Add {
                 register_type: RegisterType::ProgramCounter,
                 value: 1,
             },
-
-            // 相対アドレスで変更
             ProgramCounterChange::Relative(change) => RegisterOperation::Add {
                 register_type: RegisterType::ProgramCounter,
                 value: change,
             },
-
-            // 絶対アドレスで変更
             ProgramCounterChange::Absolute(address) => RegisterOperation::Write {
                 register_type: RegisterType::ProgramCounter,
                 value: address,
             },
+            ProgramCounterChange::Jumped => RegisterOperation::None,
         };
         self.execute_operation(register_operation);
 
@@ -96,14 +92,18 @@ pub enum RegisterType {
 // レジスタ操作の種類の列挙型
 #[derive(Debug, Clone, Copy)]
 pub enum RegisterOperation {
+    //書き込み
     Write {
-        register_type: RegisterType,
-        value: RegisterSize, // 変更する値
+        register_type: RegisterType, // レジスタ指定
+        value: RegisterSize,         // 変更する値
     },
+    //加算
     Add {
         register_type: RegisterType,
         value: RegisterSize, // 追加する値
     },
+    // 何もしない
+    None,
 }
 
 #[cfg(test)]
@@ -467,6 +467,16 @@ mod tests {
             registers.update_program_counter(ProgramCounterChange::Relative(3));
 
             assert_eq!(registers.read_program_counter(), 33);
+        }
+
+        // PCが既に書き換わっている場合
+        #[test]
+        fn test_read_update_program_counter_jumped() {
+            let mut registers = ExampleRegisters::new();
+            registers.update_program_counter(ProgramCounterChange::Absolute(12));
+            registers.update_program_counter(ProgramCounterChange::Jumped);
+
+            assert_eq!(registers.read_program_counter(), 12);
         }
     }
 

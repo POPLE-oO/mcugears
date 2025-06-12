@@ -39,6 +39,7 @@ pub enum ProgramCounterChange {
     Default,                // PCをインクリメント(PC←PC+1)
     Absolute(RegisterSize), // 絶対アドレス(直接目標のアドレスへ)
     Relative(RegisterSize), // 相対アドレス(現在のアドレスからの変化量)
+    Jumped,                 // ジャンプ済み(更新済み)
 }
 
 impl CommandResult {
@@ -71,11 +72,13 @@ pub mod test_utilities {
 
     pub enum ExampleCommand {
         Add { id_d: RegisterId, id_r: RegisterId },
+        Jmp { val_k: RegisterSize },
     }
     impl<R: Registers> Command<R> for ExampleCommand {
         fn run(&self, registers: &mut R) -> CommandResult {
             match self {
-                Self::Add { id_d, id_r } => Self::add(registers, *id_d, *id_r),
+                ExampleCommand::Add { id_d, id_r } => Self::add(registers, *id_d, *id_r),
+                ExampleCommand::Jmp { val_k } => Self::jmp(registers, *val_k),
             }
         }
 
@@ -85,18 +88,22 @@ pub mod test_utilities {
     }
 
     impl ExampleCommand {
-        pub fn add<R: Registers>(
+        fn add<R: Registers>(
             registers: &mut R,
             id_d: RegisterId,
             id_r: RegisterId,
         ) -> CommandResult {
+            // それぞれの値取得
             let rd = registers.read_register_value(RegisterType::General { id: id_d });
             let rr = registers.read_register_value(RegisterType::General { id: id_r });
+
+            // add実行
             registers.execute_operation(RegisterOperation::Add {
                 register_type: RegisterType::General { id: id_d },
                 value: rr,
             });
 
+            // 結果
             let result = registers.read_register_value(RegisterType::General { id: id_d });
             CommandResult::new(
                 &format!(
@@ -105,6 +112,20 @@ pub mod test_utilities {
                 ),
                 1,
                 ProgramCounterChange::Default,
+            )
+        }
+
+        fn jmp<R: Registers>(registers: &mut R, val_k: RegisterSize) -> CommandResult {
+            let start_program_counter = registers.read_program_counter();
+            registers.update_program_counter(ProgramCounterChange::Absolute(val_k));
+            let end_program_counter = registers.read_program_counter();
+            CommandResult::new(
+                &format!(
+                    "[JMP]: Jump from:{} to:{}, Result:PC:{}",
+                    start_program_counter, val_k, end_program_counter
+                ),
+                3,
+                ProgramCounterChange::Jumped,
             )
         }
     }
@@ -148,6 +169,24 @@ mod tests {
                     ),
                     1,
                     ProgramCounterChange::Default,
+                )
+            );
+        }
+
+        // jmpの実行
+        #[test]
+        fn test_command_run_jmp() {
+            let mut registers = ExampleRegisters::new();
+            registers.update_program_counter(ProgramCounterChange::Absolute(15));
+            let command = ExampleCommand::Jmp { val_k: 1202 };
+            let result = command.run(&mut registers);
+
+            assert_eq!(
+                result,
+                CommandResult::new(
+                    &format!("[JMP]: Jump from:{} to:{}, Result:PC:{}", 15, 1202, 1202),
+                    3,
+                    ProgramCounterChange::Jumped,
                 )
             );
         }
