@@ -26,7 +26,7 @@ pub trait Command<R: Registers> {
 }
 
 // 命令の実行結果
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CommandResult {
     debug_info: String,                           // 実行したコマンドの詳細(デバック用)
     clocks: RegisterSize,                         // 実行クロック
@@ -34,7 +34,7 @@ pub struct CommandResult {
 }
 
 // プログラムカウンター(命令アドレス)の更新方法
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ProgramCounterChange {
     Default,                // PCをインクリメント(PC←PC+1)
     Absolute(RegisterSize), // 絶対アドレス(直接目標のアドレスへ)
@@ -63,43 +63,93 @@ impl CommandResult {
         self.program_counter_change
     }
 }
-
 #[cfg(test)]
-mod tests {
+pub mod test_utilities {
+
     use super::*;
-    use ExampleCommand::*;
-    use registers::test_utilities::*;
+    use crate::{RegisterId, RegisterSize};
 
-    enum ExampleCommand {
-        Add(RegisterId, RegisterId),
+    pub enum ExampleCommand {
+        Add { id_d: RegisterId, id_r: RegisterId },
     }
-
     impl<R: Registers> Command<R> for ExampleCommand {
         fn run(&self, registers: &mut R) -> CommandResult {
             match self {
-                Self::Add(rd, rr) => Self::add(registers, *rd, *rr),
+                Self::Add { id_d, id_r } => Self::add(registers, *id_d, *id_r),
             }
         }
 
         fn is_side_effect(&self) -> bool {
-            match self {
-                _ => true,
-            }
+            todo!()
         }
     }
 
     impl ExampleCommand {
         pub fn add<R: Registers>(
             registers: &mut R,
-            rd: RegisterId,
-            rr: RegisterId,
+            id_d: RegisterId,
+            id_r: RegisterId,
         ) -> CommandResult {
+            let rd = registers.read_register_value(RegisterType::General { id: id_d });
+            let rr = registers.read_register_value(RegisterType::General { id: id_r });
             registers.execute_operation(RegisterOperation::Add {
-                register_type: RegisterType::General { id: rd },
-                value: registers.read_register_value(RegisterType::General { id: rr }),
+                register_type: RegisterType::General { id: id_d },
+                value: rr,
             });
 
-            CommandResult::new("[ADD]: Rd ← Rd + Rr", 1, ProgramCounterChange::Default)
+            let result = registers.read_register_value(RegisterType::General { id: id_d });
+            CommandResult::new(
+                &format!(
+                    "[ADD]: Add Rd({}):{} and Rr({}):{}, Result:Rd({}):{}",
+                    id_d, rd, id_r, rr, id_d, result
+                ),
+                1,
+                ProgramCounterChange::Default,
+            )
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_utilities::*;
+    use super::*;
+    use crate::registers::test_utilities::*;
+    use crate::registers::*;
+
+    // ---  commandの実行 ---
+    #[cfg(test)]
+    mod test_command_run {
+        use super::*;
+
+        // --- commandの実行テスト ---
+        // addの実行
+        #[test]
+        fn test_command_run_add() {
+            let mut registers = ExampleRegisters::new();
+            registers
+                .execute_operation(RegisterOperation::Write {
+                    register_type: RegisterType::General { id: 14 },
+                    value: 33,
+                })
+                .execute_operation(RegisterOperation::Write {
+                    register_type: RegisterType::General { id: 19 },
+                    value: 22,
+                });
+            let command = ExampleCommand::Add { id_d: 14, id_r: 19 };
+            let result = command.run(&mut registers);
+
+            assert_eq!(
+                result,
+                CommandResult::new(
+                    &format!(
+                        "[ADD]: Add Rd(14):{} and Rr(19):{}, Result:Rd(14):{}",
+                        33, 22, 55
+                    ),
+                    1,
+                    ProgramCounterChange::Default,
+                )
+            );
         }
     }
 }
