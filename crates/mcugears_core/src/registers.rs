@@ -480,7 +480,7 @@ mod tests {
         // 対応する最大のクロック周波数[16MHz]
         const MAX_CLOCKS_FREQUENCY: usize = 16e6 as usize;
         // 1commandあたりのoperation数[operations/command]
-        const OPERATIONS_IN_ONE_COMMAND: usize = 6;
+        const OPERATIONS_IN_ONE_COMMAND: usize = 4;
 
         // --- execute_opeartionのパフォーマンス計測 ---
         // writeのパフォーマンス
