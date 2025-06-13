@@ -6,7 +6,6 @@ Microcontroller emulator written in Rust.
 
 ```dir
 mcugears/               // workspace
-├── Cargo.lock  
 ├── Cargo.toml
 ├── LICENSE
 ├── README.md           // ← 現在の場所
@@ -94,3 +93,22 @@ impl Registers for ExampleRegisters{}
 ## AVR
 
 とりあえずAtmega328pのアーキテクチャを実装したい
+
+### register構成
+
+とりあえずレジスタ構成は以下に従えばよさそう
+[ATmega328P DATASHEET](https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf)
+
+- 「30.Register Summary」にたぶん全体が載ってる
+- Reserved はエミュ上では気にしなくていいと思う(命令さえ実現すればいいから)
+- 詳細に関しては表の右側にページで乗ってる
+
+### instruction
+
+opcodeとかはデータシートじゃなくてアーキテクチャの説明に書いてあるっぽい
+ATmega328pはAVRe+アーキテクチャらしいのでAVRアーキテクチャの仕様書から必要なものを実装する
+
+[AVR Instruction Set Manual](https://ww1.microchip.com/downloads/aemDocuments/documents/MCU08/ProductDocuments/ReferenceManuals/AVR-InstructionSet-Manual-DS40002198.pdf)
+
+- 具体的なbit列やstatusレジスタまで乗ってたのでこれでいいと思う
+- ボードごとに微妙に仕様が違って最後のほうにそれが載ってるから注意

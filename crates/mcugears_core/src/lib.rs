@@ -16,7 +16,7 @@ pub type RegisterSize = i64; // レジスタの最大サイズ
 pub struct Mcu<R, C>
 where
     R: Registers,
-    C: Command<R>,
+    C: Command,
 {
     registers: R,                                        // レジスタの構造体
     commands: Vec<C>,                                    // 命令列
@@ -27,11 +27,11 @@ where
 impl<R, C> Mcu<R, C>
 where
     R: Registers,
-    C: Command<R>,
+    C: Command,
 {
     // コンストラクタ
     fn new(registers: R, commands: Vec<C>) -> Self {
-        let timer_num = registers.read_register_count(RegisterType::Timer { id: 0 }) as usize;
+        let timer_num = registers.read_register_num(RegisterType::Timer { id: 0 }) as usize;
         Mcu {
             registers,
             commands,
@@ -86,7 +86,7 @@ where
 impl<R, C> Iterator for Mcu<R, C>
 where
     R: Registers,
-    C: Command<R>,
+    C: Command,
 {
     type Item = String;
     // 次の命令を実行する
@@ -122,6 +122,4 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-}
+mod tests {}

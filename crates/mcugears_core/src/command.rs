@@ -2,9 +2,9 @@
 use crate::*;
 
 // 一つの命令(命令の種類のEnum)の振る舞い
-pub trait Command<R: Registers> {
+pub trait Command {
     // コマンドを実行
-    fn run(&self, registers: &mut R) -> CommandResult;
+    fn run<R: Registers>(&self, registers: &mut R) -> CommandResult;
     // 現在のコマンドの種類を取得
     fn is_side_effect(&self) -> bool;
 
@@ -74,8 +74,8 @@ pub mod test_utilities {
         Add { id_d: RegisterId, id_r: RegisterId },
         Jmp { val_k: RegisterSize },
     }
-    impl<R: Registers> Command<R> for ExampleCommand {
-        fn run(&self, registers: &mut R) -> CommandResult {
+    impl Command for ExampleCommand {
+        fn run<R: Registers>(&self, registers: &mut R) -> CommandResult {
             match self {
                 ExampleCommand::Add { id_d, id_r } => Self::add(registers, *id_d, *id_r),
                 ExampleCommand::Jmp { val_k } => Self::jmp(registers, *val_k),
@@ -83,7 +83,10 @@ pub mod test_utilities {
         }
 
         fn is_side_effect(&self) -> bool {
-            todo!()
+            match self {
+                ExampleCommand::Add { id_d: _, id_r: _ } => false,
+                ExampleCommand::Jmp { val_k: _ } => false,
+            }
         }
     }
 
@@ -189,6 +192,20 @@ mod tests {
                     ProgramCounterChange::Jumped,
                 )
             );
+        }
+    }
+    // ---  副作用かのチェック  ---
+    #[cfg(test)]
+    mod test_command_is_sideeffect {
+        use crate::command::{Command, test_utilities::ExampleCommand};
+
+        #[test]
+        fn test_is_sideefect_defalt() {
+            let command_add = ExampleCommand::Add { id_d: 3, id_r: 2 };
+            let command_jmp = ExampleCommand::Jmp { val_k: 112 };
+
+            assert!(!command_add.is_side_effect());
+            assert!(!command_jmp.is_side_effect());
         }
     }
 }

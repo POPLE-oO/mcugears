@@ -10,7 +10,7 @@ pub trait Registers {
     // 値取得
     fn read_register_value(&self, register_type: RegisterType) -> RegisterSize;
     // レジスタの数を取得
-    fn read_register_count(&self, register_type: RegisterType) -> RegisterId;
+    fn read_register_num(&self, register_type: RegisterType) -> RegisterId;
 
     // レジスタの変更操作を受け取り変更をする
     fn execute_operation(&mut self, operation: RegisterOperation) -> &mut Self {
@@ -110,27 +110,41 @@ pub enum RegisterOperation {
 pub mod test_utilities {
     use super::*;
 
+    // レジスタに関する定数
+    const MAX_GENERAL_COUNT: usize = 32;
+    const MAX_TIMER_COUNT: usize = 1;
+
+    // レジスタサイズの型
+    pub type RegisterSizeGeneral = u8;
+    pub type RegisterSizeTimer = u8;
+    pub type RegisterSizeProgramCounter = u16;
+
     #[derive(Debug, PartialEq)]
     pub struct ExampleRegisters {
-        general: [u8; 32],
-        timer: [u8; 1],
-        program_counter: u16,
+        general: [RegisterSizeGeneral; MAX_GENERAL_COUNT],
+        timer: [RegisterSizeTimer; MAX_TIMER_COUNT],
+        program_counter: RegisterSizeProgramCounter,
+        // prescaler_interval: [RegisterSize; MAX_TIMER_COUNT],
     }
 
     impl Registers for ExampleRegisters {
         fn new() -> Self {
             Self {
-                general: [0; 32],
-                timer: [0; 1],
+                general: [0; MAX_GENERAL_COUNT],
+                timer: [0; MAX_TIMER_COUNT],
                 program_counter: 0,
             }
         }
 
         fn set_register(&mut self, register_type: RegisterType, value: RegisterSize) {
             match register_type {
-                RegisterType::General { id } => self.general[id as usize] = value as u8,
-                RegisterType::Timer { id } => self.timer[id as usize] = value as u8,
-                RegisterType::ProgramCounter => self.program_counter = value as u16,
+                RegisterType::General { id } => {
+                    self.general[id as usize] = value as RegisterSizeGeneral
+                }
+                RegisterType::Timer { id } => self.timer[id as usize] = value as RegisterSizeTimer,
+                RegisterType::ProgramCounter => {
+                    self.program_counter = value as RegisterSizeProgramCounter
+                }
             }
         }
 
@@ -142,12 +156,13 @@ pub mod test_utilities {
             }
         }
 
-        fn read_register_count(&self, register_type: RegisterType) -> RegisterId {
-            match register_type {
-                RegisterType::General { id: _ } => 32,
-                RegisterType::Timer { id: _ } => 1,
+        fn read_register_num(&self, register_type: RegisterType) -> RegisterId {
+            let count = match register_type {
+                RegisterType::General { id: _ } => MAX_GENERAL_COUNT,
+                RegisterType::Timer { id: _ } => MAX_TIMER_COUNT,
                 RegisterType::ProgramCounter => 1,
-            }
+            };
+            count as RegisterId
         }
 
         fn update_timer(
@@ -186,8 +201,8 @@ pub mod test_utilities {
         #[test]
         fn test_new() {
             let registers = ExampleRegisters::new();
-            assert_eq!(registers.general, [0; 32]);
-            assert_eq!(registers.timer, [0; 1]);
+            assert_eq!(registers.general, [0; MAX_GENERAL_COUNT]);
+            assert_eq!(registers.timer, [0; MAX_TIMER_COUNT]);
             assert_eq!(registers.program_counter, 0);
         }
     }
@@ -202,35 +217,32 @@ mod tests {
     #[cfg(test)]
     mod test_registers_set_read {
         use super::*;
-        // ---  read_register_count  ---
+        // ---  read_register_num  ---
         // generalのcount
         #[test]
-        fn test_read_register_count_general() {
+        fn test_read_register_num_general() {
             let registers = ExampleRegisters::new();
             assert_eq!(
-                registers.read_register_count(RegisterType::General { id: 0 }),
+                registers.read_register_num(RegisterType::General { id: 0 }),
                 32
             );
         }
 
         // timerのcount
         #[test]
-        fn test_read_register_count_timer() {
+        fn test_read_register_num_timer() {
             let registers = ExampleRegisters::new();
             assert_eq!(
-                registers.read_register_count(RegisterType::Timer { id: 0 }),
+                registers.read_register_num(RegisterType::Timer { id: 0 }),
                 1
             );
         }
 
         // program_counterのcount
         #[test]
-        fn test_read_register_count_program_counter() {
+        fn test_read_register_num_program_counter() {
             let registers = ExampleRegisters::new();
-            assert_eq!(
-                registers.read_register_count(RegisterType::ProgramCounter),
-                1
-            );
+            assert_eq!(registers.read_register_num(RegisterType::ProgramCounter), 1);
         }
 
         // --- set_register, read_register_valueのテスト---
@@ -496,7 +508,7 @@ mod tests {
         // writeのパフォーマンス
         #[test]
         #[ignore]
-        fn test_execute_operation_performance_write() {
+        fn bench_execute_operation_performance_write() {
             let mut registers = ExampleRegisters::new();
 
             // 適当な値でoperationsを生成
@@ -535,7 +547,7 @@ mod tests {
         // addのパフォーマンス
         #[test]
         #[ignore]
-        fn test_execute_operation_performance_add() {
+        fn bench_execute_operation_performance_add() {
             let mut registers = ExampleRegisters::new();
 
             // 適当な値でoperationsを生成
