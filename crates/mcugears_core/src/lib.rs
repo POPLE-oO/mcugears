@@ -22,9 +22,8 @@ where
     R: Registers,
     C: Command,
 {
-    registers: R,                                        // レジスタの構造体
-    commands: Vec<C>,                                    // 命令列
-    elapsed_clocks_from_timer_update: Vec<RegisterSize>, // タイマーのカウントアップからの経過時間(プリスケーラ用)
+    registers: R,     // レジスタの構造体
+    commands: Vec<C>, // 命令列
 }
 
 // マイコン操作の実装
@@ -35,11 +34,9 @@ where
 {
     // コンストラクタ
     fn new(registers: R, commands: Vec<C>) -> Self {
-        let timer_num = registers.read_register_num(RegisterType::Timer { id: 0 }) as usize;
         Mcu {
             registers,
             commands,
-            elapsed_clocks_from_timer_update: vec![0; timer_num],
         }
     }
 
