@@ -74,6 +74,7 @@ pub mod test_utilities {
         Add { id_d: RegisterId, id_r: RegisterId },
         Jmp { val_k: RegisterSize },
     }
+
     impl Command for ExampleCommand {
         fn run<R: Registers>(&self, registers: &mut R) -> CommandResult {
             match self {

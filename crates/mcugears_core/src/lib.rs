@@ -3,9 +3,13 @@ use std::iter::Iterator;
 
 // Mcu要素のインポート
 pub mod command;
+pub mod heap;
 pub mod registers;
+pub mod stack;
 use command::*;
+use heap::*;
 use registers::*;
+use stack::*;
 
 // 既定の型
 pub type RegisterId = u8; // レジスタのidを格納するための型
