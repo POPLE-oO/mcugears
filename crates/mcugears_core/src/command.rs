@@ -23,6 +23,13 @@ pub trait Command {
             ProgramCounterChange::Default,
         )
     }
+    fn nop() -> CommandResult {
+        CommandResult::new(
+            "[NOP]: Single cycle no operation",
+            1,
+            ProgramCounterChange::Default,
+        )
+    }
 }
 
 // 命令の実行結果
@@ -74,6 +81,7 @@ pub mod test_utilities {
     pub enum ExampleCommand {
         Add { id_d: RegisterId, id_r: RegisterId },
         Jmp { val_k: RegisterSize },
+        Nop,
         Empty,
     }
 
@@ -83,6 +91,7 @@ pub mod test_utilities {
                 ExampleCommand::Add { id_d, id_r } => Self::add(registers, *id_d, *id_r),
                 ExampleCommand::Jmp { val_k } => Self::jmp(registers, *val_k),
                 ExampleCommand::Empty => Self::empty_operation(),
+                ExampleCommand::Nop => Self::nop(),
             }
         }
 
@@ -91,6 +100,7 @@ pub mod test_utilities {
                 ExampleCommand::Add { id_d: _, id_r: _ } => false,
                 ExampleCommand::Jmp { val_k: _ } => false,
                 ExampleCommand::Empty => false,
+                ExampleCommand::Nop => false,
             }
         }
     }
@@ -208,6 +218,23 @@ mod tests {
                 CommandResult::new(
                     "[EMPTY]: This is empty address for instructions longer than the base instruction length",
                     0,
+                    ProgramCounterChange::Default,
+                )
+            );
+        }
+
+        // nopの実行
+        #[test]
+        fn test_nop() {
+            let mut registers = ExampleRegisters::new();
+            let command = ExampleCommand::Nop;
+            let result = command.run(&mut registers);
+
+            assert_eq!(
+                result,
+                CommandResult::new(
+                    "[NOP]: Single cycle no operation",
+                    1,
                     ProgramCounterChange::Default,
                 )
             );

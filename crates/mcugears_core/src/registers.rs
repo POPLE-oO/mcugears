@@ -208,7 +208,11 @@ pub mod test_utilities {
             // プリスケーラ定義(仮)
             let prescalers = [64];
 
-            for i in 0..register_max::TIMER {
+            for i in 0..self.read_register_num(RegisterType::Status {
+                id: ExampleStatusType::PrescalerInterval.to_id(),
+                index: 0,
+            }) as usize
+            {
                 // 経過時間追加
                 let elapsed = self
                     .execute_operation(RegisterOperation::Add {
