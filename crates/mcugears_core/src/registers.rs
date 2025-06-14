@@ -10,7 +10,7 @@ pub trait Registers {
     // 値取得
     fn read_register_value(&self, register_type: RegisterType) -> RegisterSize;
     // レジスタの数を取得
-    fn read_register_count(&self, register_type: RegisterType) -> RegisterId;
+    fn read_register_num(&self, register_type: RegisterType) -> RegisterId;
 
     // レジスタの変更操作を受け取り変更をする
     fn execute_operation(&mut self, operation: RegisterOperation) -> &mut Self {
@@ -19,7 +19,6 @@ pub trait Registers {
                 register_type,
                 value,
             } => self.set_register(register_type, value),
-
             RegisterOperation::Add {
                 register_type,
                 value,
@@ -27,6 +26,7 @@ pub trait Registers {
                 register_type,
                 self.read_register_value(register_type).wrapping_add(value),
             ),
+            RegisterOperation::None => {}
         };
 
         self
@@ -40,11 +40,7 @@ pub trait Registers {
     }
 
     // タイマーを更新
-    fn update_timer(
-        &mut self,
-        elapsed_clocks_from_timer_update: &mut Vec<RegisterSize>,
-        clocks: RegisterSize,
-    ) -> &mut Self;
+    fn update_timer(&mut self, clocks: RegisterSize) -> &mut Self;
 
     // プログラムカウンター(命令アドレス)の値を返す
     fn read_program_counter(&mut self) -> RegisterSize {
@@ -60,23 +56,19 @@ pub trait Registers {
         // プログラムカウンター更新
 
         let register_operation = match program_couter_change {
-            // インクリメントで変更(PC←PC+1)
             ProgramCounterChange::Default => RegisterOperation::Add {
                 register_type: RegisterType::ProgramCounter,
                 value: 1,
             },
-
-            // 相対アドレスで変更
             ProgramCounterChange::Relative(change) => RegisterOperation::Add {
                 register_type: RegisterType::ProgramCounter,
                 value: change,
             },
-
-            // 絶対アドレスで変更
             ProgramCounterChange::Absolute(address) => RegisterOperation::Write {
                 register_type: RegisterType::ProgramCounter,
                 value: address,
             },
+            ProgramCounterChange::Jumped => RegisterOperation::None,
         };
         self.execute_operation(register_operation);
 
@@ -90,47 +82,92 @@ pub trait Registers {
 pub enum RegisterType {
     General { id: RegisterId }, // 汎用レジスタ
     Timer { id: RegisterId },   // タイマー(経過時間)
-    ProgramCounter,             // プログラムカウンタ(命令アドレス)
+    ProgramCounter,
+    Status { id: RegisterId, index: RegisterId }, // プログラムカウンタ(命令アドレス)
 }
 
 // レジスタ操作の種類の列挙型
 #[derive(Debug, Clone, Copy)]
 pub enum RegisterOperation {
+    //書き込み
     Write {
-        register_type: RegisterType,
-        value: RegisterSize, // 変更する値
+        register_type: RegisterType, // レジスタ指定
+        value: RegisterSize,         // 変更する値
     },
+    //加算
     Add {
         register_type: RegisterType,
         value: RegisterSize, // 追加する値
     },
+    // 何もしない
+    None,
 }
 
 #[cfg(test)]
 pub mod test_utilities {
     use super::*;
 
-    #[derive(Debug, PartialEq)]
+    // レジスタの個数
+    pub mod example_registers_max_size {
+        pub const GENERAL: usize = 32;
+        pub const TIMER: usize = 1;
+    }
+
+    // レジスタサイズの型
+    pub mod example_registers_size {
+        pub type General = u8;
+        pub type Timer = u16;
+        pub type PrescalerInterval = u16;
+        pub type ProgramCounter = u16;
+    }
+    use example_registers_max_size as register_max;
+    use example_registers_size as register_size;
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub enum ExampleStatusType {
+        PrescalerInterval,
+    }
+
+    impl ExampleStatusType {
+        pub fn to_id(self) -> RegisterId {
+            self as RegisterId
+        }
+    }
+
+    #[derive(Default, Debug, PartialEq)]
     pub struct ExampleRegisters {
-        general: [u8; 32],
-        timer: [u8; 1],
-        program_counter: u16,
+        general: [register_size::General; register_max::GENERAL],
+        timer: [register_size::Timer; register_max::TIMER],
+        program_counter: register_size::ProgramCounter,
+        prescaler_interval: [register_size::PrescalerInterval; register_max::TIMER],
     }
 
     impl Registers for ExampleRegisters {
         fn new() -> Self {
-            Self {
-                general: [0; 32],
-                timer: [0; 1],
-                program_counter: 0,
-            }
+            Self::default()
         }
 
         fn set_register(&mut self, register_type: RegisterType, value: RegisterSize) {
             match register_type {
-                RegisterType::General { id } => self.general[id as usize] = value as u8,
-                RegisterType::Timer { id } => self.timer[id as usize] = value as u8,
-                RegisterType::ProgramCounter => self.program_counter = value as u16,
+                RegisterType::General { id } => {
+                    self.general[id as usize] = value as register_size::General
+                }
+                RegisterType::Timer { id } => {
+                    self.timer[id as usize] = value as register_size::Timer
+                }
+                RegisterType::ProgramCounter => {
+                    self.program_counter = value as register_size::ProgramCounter
+                }
+                RegisterType::Status { id, index } => {
+                    use ExampleStatusType::*;
+                    match id {
+                        id if id == PrescalerInterval.to_id() => {
+                            self.prescaler_interval[index as usize] =
+                                value as register_size::PrescalerInterval
+                        }
+                        _ => todo!(),
+                    }
+                }
             }
         }
 
@@ -139,56 +176,72 @@ pub mod test_utilities {
                 RegisterType::General { id } => self.general[id as usize] as RegisterSize,
                 RegisterType::Timer { id } => self.timer[id as usize] as RegisterSize,
                 RegisterType::ProgramCounter => self.program_counter as RegisterSize,
+                RegisterType::Status { id, index } => {
+                    use ExampleStatusType::*;
+                    match id {
+                        id if id == PrescalerInterval.to_id() => {
+                            self.prescaler_interval[index as usize] as RegisterSize
+                        }
+                        _ => todo!(),
+                    }
+                }
             }
         }
 
-        fn read_register_count(&self, register_type: RegisterType) -> RegisterId {
-            match register_type {
-                RegisterType::General { id: _ } => 32,
-                RegisterType::Timer { id: _ } => 1,
+        fn read_register_num(&self, register_type: RegisterType) -> RegisterId {
+            let count = match register_type {
+                RegisterType::General { id: _ } => register_max::GENERAL,
+                RegisterType::Timer { id: _ } => register_max::TIMER,
                 RegisterType::ProgramCounter => 1,
-            }
+                RegisterType::Status { id, index: _ } => {
+                    use ExampleStatusType::*;
+                    match id {
+                        id if id == PrescalerInterval.to_id() => register_max::TIMER,
+                        _ => 1,
+                    }
+                }
+            };
+            count as RegisterId
         }
 
-        fn update_timer(
-            &mut self,
-            elapsed_clocks_from_timer_update: &mut Vec<RegisterSize>,
-            clocks: RegisterSize,
-        ) -> &mut Self {
+        fn update_timer(&mut self, clocks: RegisterSize) -> &mut Self {
             // プリスケーラ定義(仮)
             let prescalers = [64];
 
-            for (id, elapsed_clocks) in elapsed_clocks_from_timer_update.iter_mut().enumerate() {
+            for i in 0..register_max::TIMER {
                 // 経過時間追加
-                *elapsed_clocks += clocks;
+                let elapsed = self
+                    .execute_operation(RegisterOperation::Add {
+                        register_type: RegisterType::Status {
+                            id: ExampleStatusType::PrescalerInterval.to_id(),
+                            index: i as RegisterId,
+                        },
+                        value: clocks,
+                    })
+                    .read_register_value(RegisterType::Status {
+                        id: ExampleStatusType::PrescalerInterval.to_id(),
+                        index: i as RegisterId,
+                    });
 
-                // プリスケーラ
+                // タイマーアップデート
                 self.execute_operation(RegisterOperation::Add {
                     register_type: RegisterType::Timer {
-                        id: id as RegisterId,
+                        id: i as RegisterId,
                     },
-                    value: *elapsed_clocks / prescalers[id], // プリスケーラの閾値を超えたらタイマーをアップデート
+                    value: elapsed / prescalers[i], // プリスケーラの閾値を超えたらタイマーをアップデート
                 });
 
                 // プリスケーラの起動しない部分は経過時間として保存しておく
-                *elapsed_clocks %= prescalers[id];
+                self.execute_operation(RegisterOperation::Write {
+                    register_type: RegisterType::Status {
+                        id: ExampleStatusType::PrescalerInterval.to_id(),
+                        index: i as RegisterId,
+                    },
+                    value: elapsed % prescalers[i],
+                });
             }
 
             self
-        }
-    }
-
-    // private フィールドにかかわるテスト
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        // new関数
-        #[test]
-        fn test_new() {
-            let registers = ExampleRegisters::new();
-            assert_eq!(registers.general, [0; 32]);
-            assert_eq!(registers.timer, [0; 1]);
-            assert_eq!(registers.program_counter, 0);
         }
     }
 }
@@ -202,35 +255,39 @@ mod tests {
     #[cfg(test)]
     mod test_registers_set_read {
         use super::*;
-        // ---  read_register_count  ---
-        // generalのcount
+        // ---  read_register_num  ---
+        // generalの個数
         #[test]
-        fn test_read_register_count_general() {
+        fn test_read_register_num_general() {
             let registers = ExampleRegisters::new();
             assert_eq!(
-                registers.read_register_count(RegisterType::General { id: 0 }),
+                registers.read_register_num(RegisterType::General { id: 0 }),
                 32
             );
         }
 
-        // timerのcount
+        // timerの個数
         #[test]
-        fn test_read_register_count_timer() {
+        fn test_read_register_num_timer() {
             let registers = ExampleRegisters::new();
             assert_eq!(
-                registers.read_register_count(RegisterType::Timer { id: 0 }),
+                registers.read_register_num(RegisterType::Timer { id: 0 }),
                 1
             );
         }
 
-        // program_counterのcount
+        // program_counterの個数
         #[test]
-        fn test_read_register_count_program_counter() {
+        fn test_read_register_num_program_個数er() {
             let registers = ExampleRegisters::new();
-            assert_eq!(
-                registers.read_register_count(RegisterType::ProgramCounter),
-                1
-            );
+            assert_eq!(registers.read_register_num(RegisterType::ProgramCounter), 1);
+        }
+
+        // statusの個数
+        #[test]
+        fn test_read_register_num_status() {
+            let registers = ExampleRegisters::new();
+            assert_eq!(registers.read_register_num(RegisterType::ProgramCounter), 1);
         }
 
         // --- set_register, read_register_valueのテスト---
@@ -238,7 +295,10 @@ mod tests {
         #[test]
         fn test_set_read_register_general() {
             let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::General { id: 4 };
+            let register_type = RegisterType::Status {
+                id: ExampleStatusType::PrescalerInterval as RegisterId,
+                index: 0,
+            };
             registers.set_register(register_type, 42);
 
             assert_eq!(registers.read_register_value(register_type), 42);
@@ -264,6 +324,19 @@ mod tests {
             assert_eq!(registers.read_register_value(register_type), 101);
         }
 
+        // statusのset,read
+        #[test]
+        fn test_set_read_register_status() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::Status {
+                id: ExampleStatusType::PrescalerInterval.to_id(),
+                index: 0,
+            };
+            registers.set_register(register_type, 15);
+
+            assert_eq!(registers.read_register_value(register_type), 15);
+        }
+
         // ---  set_registerの切り捨て処理  ---
         // generalの切り捨て
         #[test]
@@ -280,9 +353,9 @@ mod tests {
         fn test_set_register_truncation_timer() {
             let mut registers = ExampleRegisters::new();
             let register_type = RegisterType::Timer { id: 0 };
-            registers.set_register(register_type, 5000);
+            registers.set_register(register_type, 65636);
 
-            assert_eq!(registers.read_register_value(register_type), 136);
+            assert_eq!(registers.read_register_value(register_type), 100);
         }
 
         // program_counterの切り捨て
@@ -313,7 +386,7 @@ mod tests {
             let register_type = RegisterType::Timer { id: 0 };
             registers.set_register(register_type, -13);
 
-            assert_eq!(registers.read_register_value(register_type), 243);
+            assert_eq!(registers.read_register_value(register_type), 65523);
         }
 
         // program_couterへの負の値代入
@@ -400,8 +473,7 @@ mod tests {
             let mut registers = ExampleRegisters::new();
             let register_type = RegisterType::Timer { id: 0 };
 
-            let mut elapsed_clocks_from_timer_update = vec![0];
-            registers.update_timer(&mut elapsed_clocks_from_timer_update, 100);
+            registers.update_timer(100);
 
             assert_eq!(registers.read_register_value(register_type), 1);
         }
@@ -412,9 +484,8 @@ mod tests {
             let mut registers = ExampleRegisters::new();
             let register_type = RegisterType::Timer { id: 0 };
 
-            let mut elapsed_clocks_from_timer_update = vec![0];
             for _ in 0..50 {
-                registers.update_timer(&mut elapsed_clocks_from_timer_update, 2);
+                registers.update_timer(2);
             }
             assert_eq!(registers.read_register_value(register_type), 1);
         }
@@ -427,8 +498,7 @@ mod tests {
             let mut registers = ExampleRegisters::new();
             let register_type = RegisterType::Timer { id: 0 };
 
-            let mut elapsed_clocks_from_timer_update = vec![0];
-            registers.update_timer(&mut elapsed_clocks_from_timer_update, 1);
+            registers.update_timer(1);
 
             assert_eq!(registers.read_register_value(register_type), 0);
         }
@@ -468,6 +538,16 @@ mod tests {
 
             assert_eq!(registers.read_program_counter(), 33);
         }
+
+        // PCが既に書き換わっている場合
+        #[test]
+        fn test_read_update_program_counter_jumped() {
+            let mut registers = ExampleRegisters::new();
+            registers.update_program_counter(ProgramCounterChange::Absolute(12));
+            registers.update_program_counter(ProgramCounterChange::Jumped);
+
+            assert_eq!(registers.read_program_counter(), 12);
+        }
     }
 
     // --- パフォーマンス計測 ---
@@ -486,7 +566,7 @@ mod tests {
         // writeのパフォーマンス
         #[test]
         #[ignore]
-        fn test_execute_operation_performance_write() {
+        fn bench_execute_operation_performance_write() {
             let mut registers = ExampleRegisters::new();
 
             // 適当な値でoperationsを生成
@@ -525,7 +605,7 @@ mod tests {
         // addのパフォーマンス
         #[test]
         #[ignore]
-        fn test_execute_operation_performance_add() {
+        fn bench_execute_operation_performance_add() {
             let mut registers = ExampleRegisters::new();
 
             // 適当な値でoperationsを生成

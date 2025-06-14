@@ -3,9 +3,13 @@ use std::iter::Iterator;
 
 // Mcu要素のインポート
 pub mod command;
+pub mod heap;
 pub mod registers;
+pub mod stack;
 use command::*;
+use heap::*;
 use registers::*;
+use stack::*;
 
 // 既定の型
 pub type RegisterId = u8; // レジスタのidを格納するための型
@@ -16,26 +20,23 @@ pub type RegisterSize = i64; // レジスタの最大サイズ
 pub struct Mcu<R, C>
 where
     R: Registers,
-    C: Command<R>,
+    C: Command,
 {
-    registers: R,                                        // レジスタの構造体
-    commands: Vec<C>,                                    // 命令列
-    elapsed_clocks_from_timer_update: Vec<RegisterSize>, // タイマーのカウントアップからの経過時間(プリスケーラ用)
+    registers: R,     // レジスタの構造体
+    commands: Vec<C>, // 命令列
 }
 
 // マイコン操作の実装
 impl<R, C> Mcu<R, C>
 where
     R: Registers,
-    C: Command<R>,
+    C: Command,
 {
     // コンストラクタ
     fn new(registers: R, commands: Vec<C>) -> Self {
-        let timer_num = registers.read_register_count(RegisterType::Timer { id: 0 }) as usize;
         Mcu {
             registers,
             commands,
-            elapsed_clocks_from_timer_update: vec![0; timer_num],
         }
     }
 
@@ -50,8 +51,7 @@ where
         let result = command.run(&mut self.registers);
 
         // タイマーアップデート
-        self.registers
-            .update_timer(&mut self.elapsed_clocks_from_timer_update, result.clocks());
+        self.registers.update_timer(result.clocks());
 
         // プログラムカウンター更新
         let next_program_counter = self
@@ -86,7 +86,7 @@ where
 impl<R, C> Iterator for Mcu<R, C>
 where
     R: Registers,
-    C: Command<R>,
+    C: Command,
 {
     type Item = String;
     // 次の命令を実行する
@@ -100,8 +100,7 @@ where
         let result = command.run(&mut self.registers);
 
         // タイマーアップデート
-        self.registers
-            .update_timer(&mut self.elapsed_clocks_from_timer_update, result.clocks());
+        self.registers.update_timer(result.clocks());
 
         // プログラムカウンター更新
         let next_program_counter = self
@@ -122,6 +121,4 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-}
+mod tests {}

@@ -1,3 +1,4 @@
 [alias]
+t = "test --nocapture"
 tall = "test --release -j 2 -- --nocapture  --include-ignored"
 tbench = "test  -j 2 -- --nocapture  --include-ignored"
