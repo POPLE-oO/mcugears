@@ -171,10 +171,7 @@ mod tests {
             assert_eq!(
                 result,
                 CommandResult::new(
-                    &format!(
-                        "[ADD]: Add Rd(14):{} and Rr(19):{}, Result:Rd(14):{}",
-                        33, 22, 55
-                    ),
+                    "[ADD]: Add Rd(14):33 and Rr(19):22, Result:Rd(14):55",
                     1,
                     ProgramCounterChange::Default,
                 )
@@ -192,7 +189,7 @@ mod tests {
             assert_eq!(
                 result,
                 CommandResult::new(
-                    &format!("[JMP]: Jump from:{} to:{}, Result:PC:{}", 15, 1202, 1202),
+                    "[JMP]: Jump from:15 to:1202, Result:PC:1202",
                     3,
                     ProgramCounterChange::Jumped,
                 )

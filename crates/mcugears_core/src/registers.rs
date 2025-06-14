@@ -40,11 +40,7 @@ pub trait Registers {
     }
 
     // タイマーを更新
-    fn update_timer(
-        &mut self,
-        elapsed_clocks_from_timer_update: &mut Vec<RegisterSize>,
-        clocks: RegisterSize,
-    ) -> &mut Self;
+    fn update_timer(&mut self, clocks: RegisterSize) -> &mut Self;
 
     // プログラムカウンター(命令アドレス)の値を返す
     fn read_program_counter(&mut self) -> RegisterSize {
@@ -208,28 +204,41 @@ pub mod test_utilities {
             count as RegisterId
         }
 
-        fn update_timer(
-            &mut self,
-            elapsed_clocks_from_timer_update: &mut Vec<RegisterSize>,
-            clocks: RegisterSize,
-        ) -> &mut Self {
+        fn update_timer(&mut self, clocks: RegisterSize) -> &mut Self {
             // プリスケーラ定義(仮)
             let prescalers = [64];
 
-            for (id, elapsed_clocks) in elapsed_clocks_from_timer_update.iter_mut().enumerate() {
+            for i in 0..register_max::TIMER {
                 // 経過時間追加
-                *elapsed_clocks += clocks;
+                let elapsed = self
+                    .execute_operation(RegisterOperation::Add {
+                        register_type: RegisterType::Status {
+                            id: ExampleStatusType::PrescalerInterval.to_id(),
+                            index: i as RegisterId,
+                        },
+                        value: clocks,
+                    })
+                    .read_register_value(RegisterType::Status {
+                        id: ExampleStatusType::PrescalerInterval.to_id(),
+                        index: i as RegisterId,
+                    });
 
-                // プリスケーラ
+                // タイマーアップデート
                 self.execute_operation(RegisterOperation::Add {
                     register_type: RegisterType::Timer {
-                        id: id as RegisterId,
+                        id: i as RegisterId,
                     },
-                    value: *elapsed_clocks / prescalers[id], // プリスケーラの閾値を超えたらタイマーをアップデート
+                    value: elapsed / prescalers[i], // プリスケーラの閾値を超えたらタイマーをアップデート
                 });
 
                 // プリスケーラの起動しない部分は経過時間として保存しておく
-                *elapsed_clocks %= prescalers[id];
+                self.execute_operation(RegisterOperation::Write {
+                    register_type: RegisterType::Status {
+                        id: ExampleStatusType::PrescalerInterval.to_id(),
+                        index: i as RegisterId,
+                    },
+                    value: elapsed % prescalers[i],
+                });
             }
 
             self
@@ -464,8 +473,7 @@ mod tests {
             let mut registers = ExampleRegisters::new();
             let register_type = RegisterType::Timer { id: 0 };
 
-            let mut elapsed_clocks_from_timer_update = vec![0];
-            registers.update_timer(&mut elapsed_clocks_from_timer_update, 100);
+            registers.update_timer(100);
 
             assert_eq!(registers.read_register_value(register_type), 1);
         }
@@ -476,9 +484,8 @@ mod tests {
             let mut registers = ExampleRegisters::new();
             let register_type = RegisterType::Timer { id: 0 };
 
-            let mut elapsed_clocks_from_timer_update = vec![0];
             for _ in 0..50 {
-                registers.update_timer(&mut elapsed_clocks_from_timer_update, 2);
+                registers.update_timer(2);
             }
             assert_eq!(registers.read_register_value(register_type), 1);
         }
@@ -491,8 +498,7 @@ mod tests {
             let mut registers = ExampleRegisters::new();
             let register_type = RegisterType::Timer { id: 0 };
 
-            let mut elapsed_clocks_from_timer_update = vec![0];
-            registers.update_timer(&mut elapsed_clocks_from_timer_update, 1);
+            registers.update_timer(1);
 
             assert_eq!(registers.read_register_value(register_type), 0);
         }

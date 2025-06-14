@@ -54,8 +54,7 @@ where
         let result = command.run(&mut self.registers);
 
         // タイマーアップデート
-        self.registers
-            .update_timer(&mut self.elapsed_clocks_from_timer_update, result.clocks());
+        self.registers.update_timer(result.clocks());
 
         // プログラムカウンター更新
         let next_program_counter = self
@@ -104,8 +103,7 @@ where
         let result = command.run(&mut self.registers);
 
         // タイマーアップデート
-        self.registers
-            .update_timer(&mut self.elapsed_clocks_from_timer_update, result.clocks());
+        self.registers.update_timer(result.clocks());
 
         // プログラムカウンター更新
         let next_program_counter = self
