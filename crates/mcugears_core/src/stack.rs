@@ -2,4 +2,4 @@
 use crate::*;
 
 // スタック構造体の振る舞い
-pub trait stack {}
+pub trait Stack {}

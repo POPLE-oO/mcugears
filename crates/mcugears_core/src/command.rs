@@ -9,16 +9,16 @@ pub trait Command {
     fn is_side_effect(&self) -> bool;
 
     // パース時に通常よりも長い命令の場合は先頭に通常のCommand enumを用いる
-    // その後の空いたアドレスにはno_operation()を仕込む
+    // その後の空いたアドレスにはempty_operation()を仕込む
     // 例(基本16bit):
     // 32bit命令[JMP k] とすると
-    // vec![JMP(u16)、NOP] にパースされる
+    // vec![JMP(u16)、EMPTY] にパースされる
     // JMP=> /*処理*/              //こちらは通常の命令
-    // NOP=> self.no_operation()  //本来 k があるところにはno_operation
+    // EMPTY=> self.empty_operation()  //本来 k があるところにはempty_operation
     // →パース時にアドレスがずれてしまうの防ぐため
-    fn no_operation(&self) -> CommandResult {
+    fn empty_operation() -> CommandResult {
         CommandResult::new(
-            "[NOP]: This is a no-operation for instructions longer than the base instruction length",
+            "[EMPTY]: This is empty address for instructions longer than the base instruction length",
             0,
             ProgramCounterChange::Default,
         )
@@ -64,6 +64,7 @@ impl CommandResult {
         self.program_counter_change
     }
 }
+
 #[cfg(test)]
 pub mod test_utilities {
 
@@ -73,6 +74,7 @@ pub mod test_utilities {
     pub enum ExampleCommand {
         Add { id_d: RegisterId, id_r: RegisterId },
         Jmp { val_k: RegisterSize },
+        Empty,
     }
 
     impl Command for ExampleCommand {
@@ -80,6 +82,7 @@ pub mod test_utilities {
             match self {
                 ExampleCommand::Add { id_d, id_r } => Self::add(registers, *id_d, *id_r),
                 ExampleCommand::Jmp { val_k } => Self::jmp(registers, *val_k),
+                ExampleCommand::Empty => Self::empty_operation(),
             }
         }
 
@@ -87,6 +90,7 @@ pub mod test_utilities {
             match self {
                 ExampleCommand::Add { id_d: _, id_r: _ } => false,
                 ExampleCommand::Jmp { val_k: _ } => false,
+                ExampleCommand::Empty => false,
             }
         }
     }
@@ -191,6 +195,23 @@ mod tests {
                     &format!("[JMP]: Jump from:{} to:{}, Result:PC:{}", 15, 1202, 1202),
                     3,
                     ProgramCounterChange::Jumped,
+                )
+            );
+        }
+
+        // empty_operationの実行
+        #[test]
+        fn test_empty_operation() {
+            let mut registers = ExampleRegisters::new();
+            let command = ExampleCommand::Empty;
+            let result = command.run(&mut registers);
+
+            assert_eq!(
+                result,
+                CommandResult::new(
+                    "[EMPTY]: This is empty address for instructions longer than the base instruction length",
+                    0,
+                    ProgramCounterChange::Default,
                 )
             );
         }
