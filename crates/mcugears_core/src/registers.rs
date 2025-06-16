@@ -320,6 +320,19 @@ mod tests {
 
             assert_eq!(registers.read_register_value(register_type), 1520);
         }
+
+        // statusの切り捨て
+        #[test]
+        fn test_set_register_truncation_status() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::Status {
+                status_name: ExampleStatusType::PrescalerInterval,
+                index: 0,
+            };
+            registers.set_register(register_type, 65724);
+
+            assert_eq!(registers.read_register_value(register_type), 188);
+        }
     }
 
     // ---  Enum RegisterOperation を使用したレジスタ操作  ---

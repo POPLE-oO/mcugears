@@ -246,7 +246,7 @@ mod tests {
         use crate::command::{Command, test_utilities::ExampleCommand};
 
         #[test]
-        fn test_is_sideefect_defalt() {
+        fn test_is_sideefect_default() {
             let command_add = ExampleCommand::Add { id_d: 3, id_r: 2 };
             let command_jmp = ExampleCommand::Jmp { val_k: 112 };
 
