@@ -11,10 +11,6 @@ use heap::*;
 use registers::*;
 use stack::*;
 
-// 既定の型
-pub type RegisterId = u8; // レジスタのidを格納するための型
-pub type RegisterSize = i64; // レジスタの最大サイズ
-
 // マイコン操作の実体オブジェクト
 #[derive(Debug)]
 pub struct Mcu<R, C>
