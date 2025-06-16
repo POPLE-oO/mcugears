@@ -91,6 +91,7 @@ pub enum RegisterType<S> {
     General { id: RegisterId },                   // 汎用レジスタ
     Timer { id: RegisterId },                     // タイマー(経過時間)
     ProgramCounter,                               // プログラムカウンタ(命令アドレス)
+    StackPointer,                                 // スタックポインター
     Status { status_name: S, index: RegisterId }, // ステータスレジスタ
 }
 
@@ -119,14 +120,15 @@ pub mod test_utilities {
     pub mod example_registers_max_id {
         pub const GENERAL: usize = 32;
         pub const TIMER: usize = 1;
+        pub const DEFAULT: usize = 1;
     }
 
     // レジスタサイズの型
     pub mod example_registers_size {
         pub type General = u8;
         pub type Timer = u16;
-        pub type PrescalerInterval = u16;
         pub type ProgramCounter = u16;
+        pub type StackPointer = u16;
     }
     use example_registers_max_id as register_max_id;
     use example_registers_size as register_size;
@@ -141,7 +143,13 @@ pub mod test_utilities {
         general: [register_size::General; register_max_id::GENERAL],
         timer: [register_size::Timer; register_max_id::TIMER],
         program_counter: register_size::ProgramCounter,
-        prescaler_interval: [register_size::PrescalerInterval; register_max_id::TIMER],
+        stack_pointer: register_size::StackPointer,
+        other_status: ExampleStatusRegisters,
+    }
+
+    #[derive(Default, Debug, PartialEq)]
+    pub struct ExampleStatusRegisters {
+        prescaler_interval: [register_size::Timer; register_max_id::TIMER],
     }
 
     impl Registers for ExampleRegisters {
@@ -168,10 +176,13 @@ pub mod test_utilities {
                 }
                 RegisterType::Status { status_name, index } => match status_name {
                     ExampleStatusType::PrescalerInterval => {
-                        self.prescaler_interval[index as usize] =
-                            value as register_size::PrescalerInterval
+                        self.other_status.prescaler_interval[index as usize] =
+                            value as register_size::Timer
                     }
                 },
+                RegisterType::StackPointer => {
+                    self.stack_pointer = value as register_size::StackPointer
+                }
             }
         }
 
@@ -185,9 +196,10 @@ pub mod test_utilities {
                 RegisterType::ProgramCounter => self.program_counter as RegisterSize,
                 RegisterType::Status { status_name, index } => match status_name {
                     ExampleStatusType::PrescalerInterval => {
-                        self.prescaler_interval[index as usize] as RegisterSize
+                        self.other_status.prescaler_interval[index as usize] as RegisterSize
                     }
                 },
+                RegisterType::StackPointer => self.stack_pointer as RegisterSize,
             }
         }
 
@@ -290,6 +302,16 @@ mod tests {
             assert_eq!(registers.read_register_value(register_type), 15);
         }
 
+        // stack_pointerのset,read
+        #[test]
+        fn test_set_read_register_stack_pointer() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::StackPointer;
+            registers.set_register(register_type, 22);
+
+            assert_eq!(registers.read_register_value(register_type), 22);
+        }
+
         // ---  set_registerの切り捨て処理  ---
         // generalの切り捨て
         #[test]
@@ -333,6 +355,15 @@ mod tests {
 
             assert_eq!(registers.read_register_value(register_type), 188);
         }
+        // stack_pointerの切り捨て
+        #[test]
+        fn test_set_read_register_truncation_stack_pointer() {
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::StackPointer;
+            registers.set_register(register_type, 74223);
+
+            assert_eq!(registers.read_register_value(register_type), 8687);
+        }
     }
 
     // ---  Enum RegisterOperation を使用したレジスタ操作  ---
@@ -362,6 +393,12 @@ mod tests {
         fn test_execute_operation_add() {
             let mut registers = ExampleRegisters::new();
 
+            let operation = RegisterOperation::Write {
+                register_type: RegisterType::General { id: 10 },
+                value: 120,
+            };
+            registers.execute_operation(operation);
+
             let operation = RegisterOperation::Add {
                 register_type: RegisterType::General { id: 10 },
                 value: 100,
@@ -370,7 +407,68 @@ mod tests {
 
             assert_eq!(
                 registers.read_register_value(RegisterType::General { id: 10 }),
+                220
+            );
+        }
+
+        // noneをexecute_operationで実行する
+        #[test]
+        fn test_execute_operation_none() {
+            let mut registers = ExampleRegisters::new();
+
+            let operation = RegisterOperation::Add {
+                register_type: RegisterType::General { id: 10 },
+                value: 100,
+            };
+            registers.execute_operation(operation);
+
+            let operation = RegisterOperation::None;
+            registers.execute_operation(operation);
+
+            assert_eq!(
+                registers.read_register_value(RegisterType::General { id: 10 }),
                 100
+            );
+        }
+
+        // --- execute_operationの切り捨て処理
+        // writeの切り捨て
+        #[test]
+        fn test_execute_operation_trancation_write() {
+            let mut registers = ExampleRegisters::new();
+
+            let operation = RegisterOperation::Write {
+                register_type: RegisterType::General { id: 2 },
+                value: 272,
+            };
+            registers.execute_operation(operation);
+
+            assert_eq!(
+                registers.read_register_value(RegisterType::General { id: 2 }),
+                16
+            );
+        }
+
+        // addの切り捨て
+        #[test]
+        fn test_execute_operation_trancation_add() {
+            let mut registers = ExampleRegisters::new();
+
+            let operation = RegisterOperation::Add {
+                register_type: RegisterType::General { id: 21 },
+                value: 100,
+            };
+            registers.execute_operation(operation);
+
+            let operation = RegisterOperation::Add {
+                register_type: RegisterType::General { id: 21 },
+                value: 200,
+            };
+            registers.execute_operation(operation);
+
+            assert_eq!(
+                registers.read_register_value(RegisterType::General { id: 21 }),
+                44
             );
         }
 
@@ -425,7 +523,7 @@ mod tests {
             assert_eq!(registers.read_register_value(register_type), 1);
         }
 
-        // ---  elapsed_clocks_from_timer_updateとprescalerの動作確認 ---
+        // --- prescalerの動作確認 ---
         // prescalerが起動しないとき
         // (elapsed_clocks_from_timer_update < prescalerの時)
         #[test]
