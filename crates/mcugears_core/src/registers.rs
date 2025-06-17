@@ -249,6 +249,7 @@ pub mod test_utilities {
 mod tests {
     use super::test_utilities::*;
     use super::*;
+    use rstest::rstest;
 
     // ---  Registersの読み書きテスト  ---
     #[cfg(test)]
@@ -256,113 +257,40 @@ mod tests {
         use super::*;
 
         // --- set_register, read_register_valueのテスト---
-        // register.generalのset,read
-        #[test]
-        fn test_set_read_register_general() {
+        #[rstest]
+        #[case(RegisterType::General { id: 0 }, 42, 42)]
+        #[case(RegisterType::Timer { id: 0 }, 211, 211)]
+        #[case(RegisterType::ProgramCounter, 101, 101)]
+        #[case(RegisterType::Status { status_name: ExampleStatusType::PrescalerInterval, index: 0 }, 15, 15)]
+        #[case(RegisterType::StackPointer, 22, 22)]
+        fn test_set_read_register(
+            #[case] register_type: RegisterType<ExampleStatusType>,
+            #[case] value: RegisterSize,
+            #[case] expected_value: RegisterSize,
+        ) {
             let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::Status {
-                status_name: ExampleStatusType::PrescalerInterval,
-                index: 0,
-            };
-            registers.set_register(register_type, 42);
-
-            assert_eq!(registers.read_register_value(register_type), 42);
-        }
-
-        // register.timerのset,read
-        #[test]
-        fn test_set_read_register_timer() {
-            let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::Timer { id: 0 };
-            registers.set_register(register_type, 211);
-
-            assert_eq!(registers.read_register_value(register_type), 211);
-        }
-
-        // register.program_counterのset,read
-        #[test]
-        fn test_set_read_register_program_counter() {
-            let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::ProgramCounter;
-            registers.set_register(register_type, 101);
-
-            assert_eq!(registers.read_register_value(register_type), 101);
-        }
-
-        // statusのset,read
-        #[test]
-        fn test_set_read_register_status() {
-            let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::Status {
-                status_name: ExampleStatusType::PrescalerInterval,
-                index: 0,
-            };
-            registers.set_register(register_type, 15);
-
-            assert_eq!(registers.read_register_value(register_type), 15);
-        }
-
-        // stack_pointerのset,read
-        #[test]
-        fn test_set_read_register_stack_pointer() {
-            let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::StackPointer;
-            registers.set_register(register_type, 22);
-
-            assert_eq!(registers.read_register_value(register_type), 22);
+            registers.set_register(register_type, value);
+            assert_eq!(registers.read_register_value(register_type), expected_value);
         }
 
         // ---  set_registerの切り捨て処理  ---
-        // generalの切り捨て
-        #[test]
-        fn test_set_register_truncation_general() {
+        #[rstest]
+        #[case(RegisterType::General { id: 3 }, 265, 9)]
+        #[case(RegisterType::Timer { id: 0 }, 65636, 100) ]
+        #[case(RegisterType::ProgramCounter, 67056, 1520)]
+        #[case(RegisterType::Status { status_name: ExampleStatusType::PrescalerInterval, index: 0 }, 65724, 188)]
+        #[case(RegisterType::StackPointer, 74223, 8687)]
+        fn test_set_register_truncation(
+            #[case] register_type: RegisterType<ExampleStatusType>,
+            #[case] value: RegisterSize,
+            #[case] expected_truncated_value: RegisterSize,
+        ) {
             let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::General { id: 3 };
-            registers.set_register(register_type, 265);
-
-            assert_eq!(registers.read_register_value(register_type), 9);
-        }
-
-        // timerの切り捨て
-        #[test]
-        fn test_set_register_truncation_timer() {
-            let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::Timer { id: 0 };
-            registers.set_register(register_type, 65636);
-
-            assert_eq!(registers.read_register_value(register_type), 100);
-        }
-
-        // program_counterの切り捨て
-        #[test]
-        fn test_set_register_truncation_program_counter() {
-            let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::ProgramCounter;
-            registers.set_register(register_type, 67056);
-
-            assert_eq!(registers.read_register_value(register_type), 1520);
-        }
-
-        // statusの切り捨て
-        #[test]
-        fn test_set_register_truncation_status() {
-            let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::Status {
-                status_name: ExampleStatusType::PrescalerInterval,
-                index: 0,
-            };
-            registers.set_register(register_type, 65724);
-
-            assert_eq!(registers.read_register_value(register_type), 188);
-        }
-        // stack_pointerの切り捨て
-        #[test]
-        fn test_set_read_register_truncation_stack_pointer() {
-            let mut registers = ExampleRegisters::new();
-            let register_type = RegisterType::StackPointer;
-            registers.set_register(register_type, 74223);
-
-            assert_eq!(registers.read_register_value(register_type), 8687);
+            registers.set_register(register_type, value);
+            assert_eq!(
+                registers.read_register_value(register_type),
+                expected_truncated_value
+            );
         }
     }
 
@@ -371,105 +299,43 @@ mod tests {
     mod test_registers_execute_operation {
         use super::*;
         // ---  execute_operationのテスト  ---
-        // writeをexecute_operationで実行する
-        #[test]
-        fn test_execute_operation_write() {
+        #[rstest]
+        #[case(RegisterOperation::Write{register_type:RegisterType::General{id:2},value:5},RegisterType::General { id: 2 },5)]
+        #[case(RegisterOperation::Add{register_type:RegisterType::General{id:21},value:100},RegisterType::General { id: 21 },130)]
+        #[case(RegisterOperation::None,RegisterType::General { id: 11 },30)]
+        fn test_execute_operation(
+            #[case] operation: RegisterOperation<ExampleStatusType>,
+            #[case] register_type: RegisterType<ExampleStatusType>,
+            #[case] expected_value: RegisterSize,
+        ) {
             let mut registers = ExampleRegisters::new();
-
-            let operation = RegisterOperation::Write {
-                register_type: RegisterType::General { id: 2 },
-                value: 5,
-            };
-            registers.execute_operation(operation);
-
-            assert_eq!(
-                registers.read_register_value(RegisterType::General { id: 2 }),
-                5
-            );
-        }
-
-        // addをexecute_operationで実行する
-        #[test]
-        fn test_execute_operation_add() {
-            let mut registers = ExampleRegisters::new();
-
-            let operation = RegisterOperation::Write {
-                register_type: RegisterType::General { id: 10 },
-                value: 120,
-            };
-            registers.execute_operation(operation);
-
-            let operation = RegisterOperation::Add {
-                register_type: RegisterType::General { id: 10 },
-                value: 100,
-            };
-            registers.execute_operation(operation);
-
-            assert_eq!(
-                registers.read_register_value(RegisterType::General { id: 10 }),
-                220
-            );
-        }
-
-        // noneをexecute_operationで実行する
-        #[test]
-        fn test_execute_operation_none() {
-            let mut registers = ExampleRegisters::new();
-
-            let operation = RegisterOperation::Add {
-                register_type: RegisterType::General { id: 10 },
-                value: 100,
-            };
-            registers.execute_operation(operation);
-
-            let operation = RegisterOperation::None;
-            registers.execute_operation(operation);
-
-            assert_eq!(
-                registers.read_register_value(RegisterType::General { id: 10 }),
-                100
-            );
+            registers
+                .execute_operation(RegisterOperation::Write {
+                    register_type,
+                    value: 30,
+                })
+                .execute_operation(operation);
+            assert_eq!(registers.read_register_value(register_type), expected_value);
         }
 
         // --- execute_operationの切り捨て処理
-        // writeの切り捨て
-        #[test]
-        fn test_execute_operation_trancation_write() {
+        #[rstest]
+        #[case(RegisterOperation::Write{register_type:RegisterType::General{id:2},value:272},RegisterType::General { id: 2 },16)]
+        #[case(RegisterOperation::Add{register_type:RegisterType::General{id:21},value:300},RegisterType::General { id: 21 },74)]
+        #[case(RegisterOperation::None,RegisterType::General { id: 11 },30)]
+        fn test_execute_operation_truncation(
+            #[case] operation: RegisterOperation<ExampleStatusType>,
+            #[case] register_type: RegisterType<ExampleStatusType>,
+            #[case] expected_value: RegisterSize,
+        ) {
             let mut registers = ExampleRegisters::new();
-
-            let operation = RegisterOperation::Write {
-                register_type: RegisterType::General { id: 2 },
-                value: 272,
-            };
-            registers.execute_operation(operation);
-
-            assert_eq!(
-                registers.read_register_value(RegisterType::General { id: 2 }),
-                16
-            );
-        }
-
-        // addの切り捨て
-        #[test]
-        fn test_execute_operation_trancation_add() {
-            let mut registers = ExampleRegisters::new();
-
-            let operation = RegisterOperation::Add {
-                register_type: RegisterType::General { id: 21 },
-                value: 100,
-            };
-            registers.execute_operation(operation);
-
-            let operation = RegisterOperation::Add {
-                register_type: RegisterType::General { id: 21 },
-                value: 200,
-            };
-            registers.execute_operation(operation);
-
-            assert_eq!(
-                registers.read_register_value(RegisterType::General { id: 21 }),
-                44
-            );
+            registers
+                .execute_operation(RegisterOperation::Write {
+                    register_type,
+                    value: 30,
+                })
+                .execute_operation(operation);
+            assert_eq!(registers.read_register_value(register_type), expected_value);
         }
 
         // --- execute_operation_batchのテスト  ---
@@ -489,6 +355,7 @@ mod tests {
                     register_type,
                     value: 120,
                 },
+                RegisterOperation::None,
             ]);
             assert_eq!(registers.read_register_value(register_type), 132);
         }
@@ -506,11 +373,12 @@ mod tests {
             let mut registers = ExampleRegisters::new();
             let register_type = RegisterType::Timer { id: 0 };
 
-            registers.update_timer(100);
+            registers.update_timer(150);
 
-            assert_eq!(registers.read_register_value(register_type), 1);
+            assert_eq!(registers.read_register_value(register_type), 2);
         }
 
+        // --- prescalerの動作確認 ---
         // update_timerが何度も実行されたとき
         #[test]
         fn test_update_timer_repeatedly() {
@@ -523,7 +391,6 @@ mod tests {
             assert_eq!(registers.read_register_value(register_type), 1);
         }
 
-        // --- prescalerの動作確認 ---
         // prescalerが起動しないとき
         // (elapsed_clocks_from_timer_update < prescalerの時)
         #[test]
@@ -543,43 +410,21 @@ mod tests {
         use super::*;
 
         // ---  read_program_counterのテスト  ---
-        // PCの絶対的なupdateとそのread,
-        #[test]
-        fn test_read_update_program_counter_absolute() {
+        #[rstest]
+        #[case(ProgramCounterChange::Absolute(121), 121)]
+        #[case(ProgramCounterChange::Default, 21)]
+        #[case(ProgramCounterChange::Relative(30), 50)]
+        #[case(ProgramCounterChange::Jumped, 20)]
+        fn test_read_update_program_counter(
+            #[case] program_counter_change: ProgramCounterChange,
+            #[case] expected_value: RegisterSize,
+        ) {
             let mut registers = ExampleRegisters::new();
-            registers.update_program_counter(ProgramCounterChange::Absolute(121));
 
-            assert_eq!(registers.read_program_counter(), 121);
-        }
+            registers.update_program_counter(ProgramCounterChange::Absolute(20));
+            registers.update_program_counter(program_counter_change);
 
-        // PCのデフォルトのread,update
-        #[test]
-        fn test_read_update_program_counter_default() {
-            let mut registers = ExampleRegisters::new();
-            registers.update_program_counter(ProgramCounterChange::Absolute(30));
-            registers.update_program_counter(ProgramCounterChange::Default);
-
-            assert_eq!(registers.read_program_counter(), 31);
-        }
-
-        // PCの相対的なupdateとそのread,
-        #[test]
-        fn test_read_update_program_counter_relative() {
-            let mut registers = ExampleRegisters::new();
-            registers.update_program_counter(ProgramCounterChange::Absolute(30));
-            registers.update_program_counter(ProgramCounterChange::Relative(3));
-
-            assert_eq!(registers.read_program_counter(), 33);
-        }
-
-        // PCが既に書き換わっている場合
-        #[test]
-        fn test_read_update_program_counter_jumped() {
-            let mut registers = ExampleRegisters::new();
-            registers.update_program_counter(ProgramCounterChange::Absolute(12));
-            registers.update_program_counter(ProgramCounterChange::Jumped);
-
-            assert_eq!(registers.read_program_counter(), 12);
+            assert_eq!(registers.read_program_counter(), expected_value);
         }
     }
 
