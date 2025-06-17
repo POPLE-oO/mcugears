@@ -392,7 +392,7 @@ mod tests {
         }
 
         // prescalerが起動しないとき
-        // (elapsed_clocks_from_timer_update < prescalerの時)
+        // (経過時間 < prescalerの時)
         #[test]
         fn test_update_timer_prescaler_not_activated() {
             let mut registers = ExampleRegisters::new();

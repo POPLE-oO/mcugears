@@ -3,13 +3,11 @@ use std::iter::Iterator;
 
 // Mcu要素のインポート
 pub mod command;
-pub mod heap;
+pub mod data_space;
 pub mod registers;
-pub mod stack;
 use command::*;
-use heap::*;
+use data_space::*;
 use registers::*;
-use stack::*;
 
 // マイコン操作の実体オブジェクト
 #[derive(Debug)]

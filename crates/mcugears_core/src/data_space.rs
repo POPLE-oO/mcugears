@@ -2,10 +2,7 @@
 use crate::*;
 
 // スタック構造体の振る舞い
-pub trait Stack {}
+pub trait DataSpace {}
 
 #[cfg(test)]
-mod tests {
-    #[cfg(test)]
-    mod test_stack_new {}
-}
+mod tests {}

@@ -1,4 +1,4 @@
 [alias]
 t = "test -- --nocapture"
-tall = "test --release -j 1 -- --nocapture  --include-ignored"
-tbench = "test -j 1 -- --nocapture  --include-ignored"
+tall = "test --release -j 4 -- --nocapture  --include-ignored"
+tbench = "test -j 4 -- --nocapture  --include-ignored"
