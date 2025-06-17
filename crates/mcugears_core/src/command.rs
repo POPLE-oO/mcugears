@@ -1,10 +1,27 @@
 // ルートから読み込み
 use crate::*;
+use std::fmt::Debug;
 
 // 一つの命令(命令の種類のEnum)の振る舞い
-pub trait Command {
+pub trait Command: Copy {
     // コマンドを実行
     fn run<R: Registers>(&self, registers: &mut R) -> CommandResult;
+
+    // 一つのコマンドから実行、レジスタ更新までの流れ
+    fn flow_command<R: Registers>(&self, registers: &mut R) -> String {
+        // 命令実行
+        let result = self.run(registers);
+
+        registers
+            // タイマーアップデート
+            .update_timer(result.clocks())
+            // プログラムカウンター更新
+            .update_program_counter(result.program_couter_change());
+
+        // デバックログを返す
+        result.debug_info()
+    }
+
     // 現在のコマンドの種類を取得
     fn is_side_effect(&self) -> bool;
 
@@ -78,6 +95,7 @@ pub mod test_utilities {
     use super::*;
     use crate::{RegisterId, RegisterSize};
 
+    #[derive(Debug, Clone, Copy)]
     pub enum ExampleCommand {
         Add { id_d: RegisterId, id_r: RegisterId },
         Jmp { val_k: RegisterSize },

@@ -57,12 +57,8 @@ pub trait Registers {
     }
 
     // プログラムカウンター(命令アドレス)を更新して、更新後の値を返す
-    fn update_program_counter(
-        &mut self,
-        program_couter_change: ProgramCounterChange,
-    ) -> RegisterSize {
+    fn update_program_counter(&mut self, program_couter_change: ProgramCounterChange) -> &mut Self {
         // プログラムカウンター更新
-
         let register_operation = match program_couter_change {
             ProgramCounterChange::Default => RegisterOperation::Add {
                 register_type: RegisterType::ProgramCounter,
@@ -80,8 +76,7 @@ pub trait Registers {
         };
         self.execute_operation(register_operation);
 
-        // 更新後の値を返す
-        self.read_program_counter()
+        self
     }
 }
 

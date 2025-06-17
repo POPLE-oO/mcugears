@@ -27,90 +27,85 @@ where
     C: Command,
 {
     // コンストラクタ
-    fn new(registers: R, commands: Vec<C>) -> Self {
+    pub fn new(registers: R, commands: Vec<C>) -> Self {
         Mcu {
             registers,
             commands,
         }
     }
 
-    // 副作用を１つ実行
-    fn run_side_effect(&mut self) -> Option<String> {
+    // 副作用じゃないなら命令を一つ実行
+    pub fn next_pure(&mut self) -> Option<String> {
         // プログラムカウンター取得
         let current_program_coutnter = self.registers.read_program_counter();
-
         // 命令取得
-        let command = &self.commands[current_program_coutnter as usize];
-        // 命令実行
-        let result = command.run(&mut self.registers);
+        let command = self.commands[current_program_coutnter as usize];
 
-        // タイマーアップデート
-        self.registers.update_timer(result.clocks());
-
-        // プログラムカウンター更新
-        let next_program_counter = self
-            .registers
-            .update_program_counter(result.program_couter_change());
-
-        // 次の命令に副作用があるかで分岐
-        // 次の命令取得
-        let next_command = &self.commands[next_program_counter as usize];
-        if next_command.is_side_effect() {
-            // 副作用があるなら
-            Some(result.debug_info()) // 次のループ
-        } else {
+        if !command.is_side_effect() {
             // 副作用がないなら
-            None // ループ終了
+            Some(command.flow_command(&mut self.registers))
+        } else {
+            // 副作用があるなら
+            None
         }
     }
 
-    // 副作用をまとめて実行
-    fn run_side_effect_batch(&mut self) -> Vec<String> {
-        // デバック用文字列を取得
-        let mut debug_infos: Vec<String> = Vec::new();
-        // 副作用が終わるまでループ
-        while let Some(debug_info) = self.run_side_effect() {
-            debug_infos.push(debug_info);
+    // 副作用なら１つ実行
+    pub fn next_side_effect(&mut self) -> Option<String> {
+        // プログラムカウンター取得
+        let current_program_coutnter = self.registers.read_program_counter();
+        // 命令取得
+        let command = self.commands[current_program_coutnter as usize];
+
+        if command.is_side_effect() {
+            // 副作用があるなら
+            Some(command.flow_command(&mut self.registers))
+        } else {
+            // 副作用がないなら
+            None
         }
-        debug_infos
+    }
+
+    // 副作用以外を実行するイテレータに変換
+    fn to_pure_iter<'a>(&'a mut self) -> PureCommandIterator<'a, R, C> {
+        PureCommandIterator { mcu: self }
+    }
+
+    // 副作用以外を実行するイテレータに変換
+    fn to_side_effect_iter<'a>(&'a mut self) -> PureCommandIterator<'a, R, C> {
+        PureCommandIterator { mcu: self }
     }
 }
 
-// マイコン実行はイテレーションで行う
-impl<R, C> Iterator for Mcu<R, C>
+pub struct PureCommandIterator<'a, R, C>
 where
-    R: Registers,
-    C: Command,
+    R: Registers + 'a,
+    C: Command + 'a,
 {
+    mcu: &'a mut Mcu<R, C>, // レジスタの構造体
+}
+
+impl<'a, R: Registers, C: Command> Iterator for PureCommandIterator<'a, R, C> {
     type Item = String;
-    // 次の命令を実行する
+
     fn next(&mut self) -> Option<Self::Item> {
-        // プログラムカウンター取得
-        let current_program_coutnter = self.registers.read_program_counter();
+        self.mcu.next_pure()
+    }
+}
 
-        // 命令取得
-        let command = &self.commands[current_program_coutnter as usize];
-        // 命令実行
-        let result = command.run(&mut self.registers);
+pub struct SideEffectCommandIterator<'a, R, C>
+where
+    R: Registers + 'a,
+    C: Command + 'a,
+{
+    mcu: &'a mut Mcu<R, C>, // レジスタの構造体
+}
 
-        // タイマーアップデート
-        self.registers.update_timer(result.clocks());
+impl<'a, R: Registers, C: Command> Iterator for SideEffectCommandIterator<'a, R, C> {
+    type Item = String;
 
-        // プログラムカウンター更新
-        let next_program_counter = self
-            .registers
-            .update_program_counter(result.program_couter_change());
-
-        // 次の命令に副作用があるかで分岐
-        // 次の命令取得
-        let next_command = &self.commands[next_program_counter as usize];
-        if next_command.is_side_effect() {
-            // 副作用があるなら
-            None // ループ終了
-        } else {
-            // 副作用がないなら
-            Some(result.debug_info()) // 次のループ
-        }
+    fn next(&mut self) -> Option<Self::Item> {
+        self.mcu.next_side_effect()
     }
 }
 
