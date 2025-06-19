@@ -295,7 +295,7 @@ mod tests {
                 .update_program_counter(ProgramCounterChange::Absolute(22))
                 .update_timer(63);
 
-            let result = ExampleInstruction::Add { id_d: 12, id_r: 17 }.run_cycle(&mut registers);
+            ExampleInstruction::Add { id_d: 12, id_r: 17 }.run_cycle(&mut registers);
 
             assert_eq!(registers.read_from(RegisterType::General { id: 12 }), 73);
             assert_eq!(registers.read_from(RegisterType::General { id: 17 }), 41);
