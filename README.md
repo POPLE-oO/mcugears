@@ -4,10 +4,10 @@ Microcontroller emulator written in Rust.
 
 ## TODO
 
-- スタック、ヒープの実装
-- push,pop命令,alloc関係(SRAM)の実装
-- 未実装の命令を実装する(特に副作用のあるもの)
-- Mcuのtest実装
+- [ ] スタック、ヒープの実装
+- [ ] push,pop命令,alloc関係(SRAM)の実装
+- [ ] 未実装の命令を実装する(特に副作用のあるもの)
+- [ ] Mcuのtest実装
 
 ## プロジェクト構成
 

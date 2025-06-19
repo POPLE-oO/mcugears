@@ -2,117 +2,112 @@
 use std::iter::Iterator;
 
 // Mcu要素のインポート
-pub mod command;
-pub mod heap;
+pub mod data_space;
+pub mod instruction;
 pub mod registers;
-pub mod stack;
-use command::*;
-use heap::*;
+use data_space::*;
+use instruction::*;
 use registers::*;
-use stack::*;
 
 // マイコン操作の実体オブジェクト
 #[derive(Debug)]
-pub struct Mcu<R, C>
+pub struct Mcu<R, I>
 where
     R: Registers,
-    C: Command,
+    I: Instruction,
 {
-    registers: R,     // レジスタの構造体
-    commands: Vec<C>, // 命令列
+    registers: R,         // レジスタの構造体
+    instructions: Vec<I>, // 命令列
 }
 
 // マイコン操作の実装
-impl<R, C> Mcu<R, C>
+impl<R, I> Mcu<R, I>
 where
     R: Registers,
-    C: Command,
+    I: Instruction,
 {
     // コンストラクタ
-    fn new(registers: R, commands: Vec<C>) -> Self {
+    pub fn new(registers: R, instructions: Vec<I>) -> Self {
         Mcu {
             registers,
-            commands,
+            instructions,
         }
     }
 
-    // 副作用を１つ実行
-    fn run_side_effect(&mut self) -> Option<String> {
+    // 副作用じゃないなら命令を一つ実行
+    pub fn next_pure(&mut self) -> Option<String> {
         // プログラムカウンター取得
         let current_program_coutnter = self.registers.read_program_counter();
-
         // 命令取得
-        let command = &self.commands[current_program_coutnter as usize];
-        // 命令実行
-        let result = command.run(&mut self.registers);
+        let instruction = self.instructions[current_program_coutnter as usize];
 
-        // タイマーアップデート
-        self.registers.update_timer(result.clocks());
-
-        // プログラムカウンター更新
-        let next_program_counter = self
-            .registers
-            .update_program_counter(result.program_couter_change());
-
-        // 次の命令に副作用があるかで分岐
-        // 次の命令取得
-        let next_command = &self.commands[next_program_counter as usize];
-        if next_command.is_side_effect() {
-            // 副作用があるなら
-            Some(result.debug_info()) // 次のループ
-        } else {
+        if !instruction.is_side_effect() {
             // 副作用がないなら
-            None // ループ終了
+            Some(instruction.run_cycle(&mut self.registers))
+        } else {
+            // 副作用があるなら
+            None
         }
     }
 
-    // 副作用をまとめて実行
-    fn run_side_effect_batch(&mut self) -> Vec<String> {
-        // デバック用文字列を取得
-        let mut debug_infos: Vec<String> = Vec::new();
-        // 副作用が終わるまでループ
-        while let Some(debug_info) = self.run_side_effect() {
-            debug_infos.push(debug_info);
+    // 副作用なら１つ実行
+    pub fn next_side_effect(&mut self) -> Option<String> {
+        // プログラムカウンター取得
+        let current_program_coutnter = self.registers.read_program_counter();
+        // 命令取得
+        let instruction = self.instructions[current_program_coutnter as usize];
+
+        if instruction.is_side_effect() {
+            // 副作用があるなら
+            Some(instruction.run_cycle(&mut self.registers))
+        } else {
+            // 副作用がないなら
+            None
         }
-        debug_infos
+    }
+
+    // 副作用以外を実行するイテレータに変換
+    #[allow(clippy::wrong_self_convention)] // 本体を更新するためなので&mutでとる必要がある
+    fn to_pure_iter<'a>(&'a mut self) -> PureInstructionIterator<'a, R, I> {
+        PureInstructionIterator { mcu: self }
+    }
+
+    // 副作用以外を実行するイテレータに変換
+    #[allow(clippy::wrong_self_convention)]
+    fn to_side_effect_iter<'a>(&'a mut self) -> SideEffectInstructionIterator<'a, R, I> {
+        SideEffectInstructionIterator { mcu: self }
     }
 }
 
-// マイコン実行はイテレーションで行う
-impl<R, C> Iterator for Mcu<R, C>
+pub struct PureInstructionIterator<'a, R, I>
 where
-    R: Registers,
-    C: Command,
+    R: Registers + 'a,
+    I: Instruction + 'a,
 {
+    mcu: &'a mut Mcu<R, I>, // Mcuの参照
+}
+
+impl<'a, R: Registers, I: Instruction> Iterator for PureInstructionIterator<'a, R, I> {
     type Item = String;
-    // 次の命令を実行する
+
     fn next(&mut self) -> Option<Self::Item> {
-        // プログラムカウンター取得
-        let current_program_coutnter = self.registers.read_program_counter();
+        self.mcu.next_pure()
+    }
+}
 
-        // 命令取得
-        let command = &self.commands[current_program_coutnter as usize];
-        // 命令実行
-        let result = command.run(&mut self.registers);
+pub struct SideEffectInstructionIterator<'a, R, I>
+where
+    R: Registers + 'a,
+    I: Instruction + 'a,
+{
+    mcu: &'a mut Mcu<R, I>, // Mcuの参照
+}
 
-        // タイマーアップデート
-        self.registers.update_timer(result.clocks());
+impl<'a, R: Registers, I: Instruction> Iterator for SideEffectInstructionIterator<'a, R, I> {
+    type Item = String;
 
-        // プログラムカウンター更新
-        let next_program_counter = self
-            .registers
-            .update_program_counter(result.program_couter_change());
-
-        // 次の命令に副作用があるかで分岐
-        // 次の命令取得
-        let next_command = &self.commands[next_program_counter as usize];
-        if next_command.is_side_effect() {
-            // 副作用があるなら
-            None // ループ終了
-        } else {
-            // 副作用がないなら
-            Some(result.debug_info()) // 次のループ
-        }
+    fn next(&mut self) -> Option<Self::Item> {
+        self.mcu.next_side_effect()
     }
 }
 
