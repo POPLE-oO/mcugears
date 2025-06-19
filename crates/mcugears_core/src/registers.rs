@@ -15,24 +15,24 @@ pub trait Registers {
     fn new() -> Self;
 
     // 値の設定
-    fn set_register(&mut self, register_type: RegisterType<Self::StatusType>, value: RegisterSize);
+    fn write_to(&mut self, register_type: RegisterType<Self::StatusType>, value: RegisterSize);
 
     // 値取得
-    fn read_register_value(&self, register_type: RegisterType<Self::StatusType>) -> RegisterSize;
+    fn read_from(&self, register_type: RegisterType<Self::StatusType>) -> RegisterSize;
 
     // レジスタの変更操作を受け取り変更をする
-    fn execute_operation(&mut self, operation: RegisterOperation<Self::StatusType>) -> &mut Self {
+    fn execute(&mut self, operation: RegisterOperation<Self::StatusType>) -> &mut Self {
         match operation {
             RegisterOperation::Write {
                 register_type,
                 value,
-            } => self.set_register(register_type, value),
+            } => self.write_to(register_type, value),
             RegisterOperation::Add {
                 register_type,
                 value,
-            } => self.set_register(
+            } => self.write_to(
                 register_type,
-                self.read_register_value(register_type).wrapping_add(value),
+                self.read_from(register_type).wrapping_add(value),
             ),
             RegisterOperation::None => {}
         };
@@ -41,9 +41,9 @@ pub trait Registers {
     }
 
     // 処理を複数受け取ってイテレータで処理する
-    fn execute_operation_batch(&mut self, operations: &[RegisterOperation<Self::StatusType>]) {
+    fn execute_batch(&mut self, operations: &[RegisterOperation<Self::StatusType>]) {
         for operation in operations {
-            self.execute_operation(*operation);
+            self.execute(*operation);
         }
     }
 
@@ -53,7 +53,7 @@ pub trait Registers {
     // プログラムカウンター(命令アドレス)の値を返す
     fn read_program_counter(&self) -> RegisterSize {
         // 現在の値を返す
-        self.read_register_value(RegisterType::ProgramCounter)
+        self.read_from(RegisterType::ProgramCounter)
     }
 
     // プログラムカウンター(命令アドレス)を更新して、更新後の値を返す
@@ -74,7 +74,7 @@ pub trait Registers {
             },
             ProgramCounterChange::Jumped => RegisterOperation::None,
         };
-        self.execute_operation(register_operation);
+        self.execute(register_operation);
 
         self
     }
@@ -154,11 +154,7 @@ pub mod test_utilities {
             Self::default()
         }
 
-        fn set_register(
-            &mut self,
-            register_type: RegisterType<Self::StatusType>,
-            value: RegisterSize,
-        ) {
+        fn write_to(&mut self, register_type: RegisterType<Self::StatusType>, value: RegisterSize) {
             match register_type {
                 RegisterType::General { id } => {
                     self.general[id as usize] = value as register_size::General
@@ -181,10 +177,7 @@ pub mod test_utilities {
             }
         }
 
-        fn read_register_value(
-            &self,
-            register_type: RegisterType<Self::StatusType>,
-        ) -> RegisterSize {
+        fn read_from(&self, register_type: RegisterType<Self::StatusType>) -> RegisterSize {
             match register_type {
                 RegisterType::General { id } => self.general[id as usize] as RegisterSize,
                 RegisterType::Timer { id } => self.timer[id as usize] as RegisterSize,
@@ -205,20 +198,20 @@ pub mod test_utilities {
             for i in 0..register_max_id::TIMER {
                 // 経過時間追加
                 let elapsed = self
-                    .execute_operation(RegisterOperation::Add {
+                    .execute(RegisterOperation::Add {
                         register_type: RegisterType::Status {
                             status_name: ExampleStatusType::PrescalerInterval,
                             index: i as RegisterId,
                         },
                         value: clocks,
                     })
-                    .read_register_value(RegisterType::Status {
+                    .read_from(RegisterType::Status {
                         status_name: ExampleStatusType::PrescalerInterval,
                         index: i as RegisterId,
                     });
 
                 // タイマーアップデート
-                self.execute_operation(RegisterOperation::Add {
+                self.execute(RegisterOperation::Add {
                     register_type: RegisterType::Timer {
                         id: i as RegisterId,
                     },
@@ -226,7 +219,7 @@ pub mod test_utilities {
                 });
 
                 // プリスケーラの起動しない部分は経過時間として保存しておく
-                self.execute_operation(RegisterOperation::Write {
+                self.execute(RegisterOperation::Write {
                     register_type: RegisterType::Status {
                         status_name: ExampleStatusType::PrescalerInterval,
                         index: i as RegisterId,
@@ -248,27 +241,27 @@ mod tests {
 
     // ---  Registersの読み書きテスト  ---
     #[cfg(test)]
-    mod test_registers_set_read {
+    mod test_registers_write_read {
         use super::*;
 
-        // --- set_register, read_register_valueのテスト---
+        // --- write_to, read_from のテスト---
         #[rstest]
         #[case(RegisterType::General { id: 0 }, 42, 42)]
         #[case(RegisterType::Timer { id: 0 }, 211, 211)]
         #[case(RegisterType::ProgramCounter, 101, 101)]
         #[case(RegisterType::Status { status_name: ExampleStatusType::PrescalerInterval, index: 0 }, 15, 15)]
         #[case(RegisterType::StackPointer, 22, 22)]
-        fn test_set_read_register(
+        fn test_write_read_register(
             #[case] register_type: RegisterType<ExampleStatusType>,
             #[case] value: RegisterSize,
             #[case] expected_value: RegisterSize,
         ) {
             let mut registers = ExampleRegisters::new();
-            registers.set_register(register_type, value);
-            assert_eq!(registers.read_register_value(register_type), expected_value);
+            registers.write_to(register_type, value);
+            assert_eq!(registers.read_from(register_type), expected_value);
         }
 
-        // ---  set_registerの切り捨て処理  ---
+        // ---  write_toの切り捨て処理  ---
         #[rstest]
         #[case(RegisterType::General { id: 3 }, 265, 9)]
         #[case(RegisterType::Timer { id: 0 }, 65636, 100) ]
@@ -281,19 +274,16 @@ mod tests {
             #[case] expected_truncated_value: RegisterSize,
         ) {
             let mut registers = ExampleRegisters::new();
-            registers.set_register(register_type, value);
-            assert_eq!(
-                registers.read_register_value(register_type),
-                expected_truncated_value
-            );
+            registers.write_to(register_type, value);
+            assert_eq!(registers.read_from(register_type), expected_truncated_value);
         }
     }
 
     // ---  Enum RegisterOperation を使用したレジスタ操作  ---
     #[cfg(test)]
-    mod test_registers_execute_operation {
+    mod test_registers_execute {
         use super::*;
-        // ---  execute_operationのテスト  ---
+        // ---  executeのテスト  ---
         #[rstest]
         #[case(RegisterOperation::Write{register_type:RegisterType::General{id:2},value:5},RegisterType::General { id: 2 },5)]
         #[case(RegisterOperation::Add{register_type:RegisterType::General{id:21},value:100},RegisterType::General { id: 21 },130)]
@@ -305,15 +295,15 @@ mod tests {
         ) {
             let mut registers = ExampleRegisters::new();
             registers
-                .execute_operation(RegisterOperation::Write {
+                .execute(RegisterOperation::Write {
                     register_type,
                     value: 30,
                 })
-                .execute_operation(operation);
-            assert_eq!(registers.read_register_value(register_type), expected_value);
+                .execute(operation);
+            assert_eq!(registers.read_from(register_type), expected_value);
         }
 
-        // --- execute_operationの切り捨て処理
+        // --- executeの切り捨て処理
         #[rstest]
         #[case(RegisterOperation::Write{register_type:RegisterType::General{id:2},value:272},RegisterType::General { id: 2 },16)]
         #[case(RegisterOperation::Add{register_type:RegisterType::General{id:21},value:300},RegisterType::General { id: 21 },74)]
@@ -325,23 +315,23 @@ mod tests {
         ) {
             let mut registers = ExampleRegisters::new();
             registers
-                .execute_operation(RegisterOperation::Write {
+                .execute(RegisterOperation::Write {
                     register_type,
                     value: 30,
                 })
-                .execute_operation(operation);
-            assert_eq!(registers.read_register_value(register_type), expected_value);
+                .execute(operation);
+            assert_eq!(registers.read_from(register_type), expected_value);
         }
 
-        // --- execute_operation_batchのテスト  ---
-        // execute_operation_batch実行
+        // --- execute_operationのテスト  ---
+        // execute_batch実行
         #[test]
         fn test_execute_operation_batch() {
             let mut registers = ExampleRegisters::new();
 
             let register_type = RegisterType::General { id: 15 };
 
-            registers.execute_operation_batch(&[
+            registers.execute_batch(&[
                 RegisterOperation::Write {
                     register_type,
                     value: 12,
@@ -352,7 +342,7 @@ mod tests {
                 },
                 RegisterOperation::None,
             ]);
-            assert_eq!(registers.read_register_value(register_type), 132);
+            assert_eq!(registers.read_from(register_type), 132);
         }
     }
 
@@ -370,7 +360,7 @@ mod tests {
 
             registers.update_timer(150);
 
-            assert_eq!(registers.read_register_value(register_type), 2);
+            assert_eq!(registers.read_from(register_type), 2);
         }
 
         // --- prescalerの動作確認 ---
@@ -383,7 +373,7 @@ mod tests {
             for _ in 0..50 {
                 registers.update_timer(2);
             }
-            assert_eq!(registers.read_register_value(register_type), 1);
+            assert_eq!(registers.read_from(register_type), 1);
         }
 
         // prescalerが起動しないとき
@@ -395,7 +385,7 @@ mod tests {
 
             registers.update_timer(1);
 
-            assert_eq!(registers.read_register_value(register_type), 0);
+            assert_eq!(registers.read_from(register_type), 0);
         }
     }
 
@@ -434,7 +424,7 @@ mod tests {
         // 1commandあたりのoperation数[operations/command]
         const OPERATIONS_IN_ONE_COMMAND: usize = 4;
 
-        // --- execute_opeartionのパフォーマンス計測 ---
+        // --- executeのパフォーマンス計測 ---
         // writeのパフォーマンス
         #[test]
         #[ignore]
@@ -461,7 +451,7 @@ mod tests {
             // 計測開始
             let start = Instant::now();
             // operationsを実行
-            registers.execute_operation_batch(&operations);
+            registers.execute_batch(&operations);
             // 計測終了
             let elapsed = start.elapsed();
 
@@ -503,7 +493,7 @@ mod tests {
             // 計測開始
             let start = Instant::now();
             // operationsを実行
-            registers.execute_operation_batch(&operations);
+            registers.execute_batch(&operations);
             // 計測終了
             let elapsed = start.elapsed();
 

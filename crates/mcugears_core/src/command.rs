@@ -130,17 +130,17 @@ pub mod test_utilities {
             id_r: RegisterId,
         ) -> CommandResult {
             // それぞれの値取得
-            let rd = registers.read_register_value(RegisterType::General { id: id_d });
-            let rr = registers.read_register_value(RegisterType::General { id: id_r });
+            let rd = registers.read_from(RegisterType::General { id: id_d });
+            let rr = registers.read_from(RegisterType::General { id: id_r });
 
             // add実行
-            registers.execute_operation(RegisterOperation::Add {
+            registers.execute(RegisterOperation::Add {
                 register_type: RegisterType::General { id: id_d },
                 value: rr,
             });
 
             // 結果
-            let result = registers.read_register_value(RegisterType::General { id: id_d });
+            let result = registers.read_from(RegisterType::General { id: id_d });
             CommandResult::new(
                 &format!(
                     "[ADD]: Add Rd({}):{} and Rr({}):{}, Result:Rd({}):{}",
@@ -185,11 +185,11 @@ mod tests {
         fn test_command_run_add() {
             let mut registers = ExampleRegisters::new();
             registers
-                .execute_operation(RegisterOperation::Write {
+                .execute(RegisterOperation::Write {
                     register_type: RegisterType::General { id: 14 },
                     value: 33,
                 })
-                .execute_operation(RegisterOperation::Write {
+                .execute(RegisterOperation::Write {
                     register_type: RegisterType::General { id: 19 },
                     value: 22,
                 });

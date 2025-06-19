@@ -67,13 +67,15 @@ where
     }
 
     // 副作用以外を実行するイテレータに変換
+    #[allow(clippy::wrong_self_convention)] // 本体を更新するためなので&mutでとる必要がある
     fn to_pure_iter<'a>(&'a mut self) -> PureCommandIterator<'a, R, C> {
         PureCommandIterator { mcu: self }
     }
 
     // 副作用以外を実行するイテレータに変換
-    fn to_side_effect_iter<'a>(&'a mut self) -> PureCommandIterator<'a, R, C> {
-        PureCommandIterator { mcu: self }
+    #[allow(clippy::wrong_self_convention)]
+    fn to_side_effect_iter<'a>(&'a mut self) -> SideEffectCommandIterator<'a, R, C> {
+        SideEffectCommandIterator { mcu: self }
     }
 }
 
@@ -82,7 +84,7 @@ where
     R: Registers + 'a,
     C: Command + 'a,
 {
-    mcu: &'a mut Mcu<R, C>, // レジスタの構造体
+    mcu: &'a mut Mcu<R, C>, // Mcuの参照
 }
 
 impl<'a, R: Registers, C: Command> Iterator for PureCommandIterator<'a, R, C> {
@@ -98,7 +100,7 @@ where
     R: Registers + 'a,
     C: Command + 'a,
 {
-    mcu: &'a mut Mcu<R, C>, // レジスタの構造体
+    mcu: &'a mut Mcu<R, C>, // Mcuの参照
 }
 
 impl<'a, R: Registers, C: Command> Iterator for SideEffectCommandIterator<'a, R, C> {
