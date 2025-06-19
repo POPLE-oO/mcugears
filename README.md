@@ -1,3 +1,7 @@
+# mcugears
+
+Microcontroller emulator written in Rust.
+
 ## TODO
 
 - スタック、ヒープの実装

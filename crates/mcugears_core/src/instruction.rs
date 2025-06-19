@@ -3,12 +3,12 @@ use crate::*;
 use std::fmt::Debug;
 
 // 一つの命令(命令の種類のEnum)の振る舞い
-pub trait Command: Copy {
-    // コマンドを実行
-    fn run<R: Registers>(&self, registers: &mut R) -> CommandResult;
+pub trait Instruction: Copy {
+    // 命令を実行
+    fn run<R: Registers>(&self, registers: &mut R) -> InstructionResult;
 
-    // 一つのコマンドから実行、レジスタ更新までの流れ
-    fn flow_command<R: Registers>(&self, registers: &mut R) -> String {
+    // 一つの命令から実行、レジスタ更新までの流れ
+    fn run_cycle<R: Registers>(&self, registers: &mut R) -> String {
         // 命令実行
         let result = self.run(registers);
 
@@ -22,10 +22,10 @@ pub trait Command: Copy {
         result.debug_info()
     }
 
-    // 現在のコマンドの種類を取得
+    // 現在の命令の種類を取得
     fn is_side_effect(&self) -> bool;
 
-    // パース時に通常よりも長い命令の場合は先頭に通常のCommand enumを用いる
+    // パース時に通常よりも長い命令の場合は先頭に通常のInstruction enumを用いる
     // その後の空いたアドレスにはempty_operation()を仕込む
     // 例(基本16bit):
     // 32bit命令[JMP k] とすると
@@ -33,15 +33,15 @@ pub trait Command: Copy {
     // JMP=> /*処理*/              //こちらは通常の命令
     // EMPTY=> self.empty_operation()  //本来 k があるところにはempty_operation
     // →パース時にアドレスがずれてしまうの防ぐため
-    fn empty_operation() -> CommandResult {
-        CommandResult::new(
+    fn empty_operation() -> InstructionResult {
+        InstructionResult::new(
             "[EMPTY]: This is empty address for instructions longer than the base instruction length",
             0,
             ProgramCounterChange::Default,
         )
     }
-    fn nop() -> CommandResult {
-        CommandResult::new(
+    fn nop() -> InstructionResult {
+        InstructionResult::new(
             "[NOP]: Single cycle no operation",
             1,
             ProgramCounterChange::Default,
@@ -51,8 +51,8 @@ pub trait Command: Copy {
 
 // 命令の実行結果
 #[derive(Debug, Clone, PartialEq)]
-pub struct CommandResult {
-    debug_info: String,                           // 実行したコマンドの詳細(デバック用)
+pub struct InstructionResult {
+    debug_info: String,                           // 実行した命令の詳細(デバック用)
     clocks: RegisterSize,                         // 実行クロック
     program_counter_change: ProgramCounterChange, // プログラムカウンタ更新情報
 }
@@ -66,13 +66,13 @@ pub enum ProgramCounterChange {
     Jumped,                 // ジャンプ済み(更新済み)
 }
 
-impl CommandResult {
+impl InstructionResult {
     pub fn new(
         debug_info: &str,
         clocks: RegisterSize,
         pc_change: ProgramCounterChange,
-    ) -> CommandResult {
-        CommandResult {
+    ) -> InstructionResult {
+        InstructionResult {
             debug_info: debug_info.to_string(),
             clocks,
             program_counter_change: pc_change,
@@ -96,39 +96,39 @@ pub mod test_utilities {
     use crate::{RegisterId, RegisterSize};
 
     #[derive(Debug, Clone, Copy)]
-    pub enum ExampleCommand {
+    pub enum ExampleInstruction {
         Add { id_d: RegisterId, id_r: RegisterId },
         Jmp { val_k: RegisterSize },
         Nop,
         Empty,
     }
 
-    impl Command for ExampleCommand {
-        fn run<R: Registers>(&self, registers: &mut R) -> CommandResult {
+    impl Instruction for ExampleInstruction {
+        fn run<R: Registers>(&self, registers: &mut R) -> InstructionResult {
             match self {
-                ExampleCommand::Add { id_d, id_r } => Self::add(registers, *id_d, *id_r),
-                ExampleCommand::Jmp { val_k } => Self::jmp(registers, *val_k),
-                ExampleCommand::Empty => Self::empty_operation(),
-                ExampleCommand::Nop => Self::nop(),
+                ExampleInstruction::Add { id_d, id_r } => Self::add(registers, *id_d, *id_r),
+                ExampleInstruction::Jmp { val_k } => Self::jmp(registers, *val_k),
+                ExampleInstruction::Empty => Self::empty_operation(),
+                ExampleInstruction::Nop => Self::nop(),
             }
         }
 
         fn is_side_effect(&self) -> bool {
             match self {
-                ExampleCommand::Add { id_d: _, id_r: _ } => false,
-                ExampleCommand::Jmp { val_k: _ } => false,
-                ExampleCommand::Empty => false,
-                ExampleCommand::Nop => false,
+                ExampleInstruction::Add { id_d: _, id_r: _ } => false,
+                ExampleInstruction::Jmp { val_k: _ } => false,
+                ExampleInstruction::Empty => false,
+                ExampleInstruction::Nop => false,
             }
         }
     }
 
-    impl ExampleCommand {
+    impl ExampleInstruction {
         fn add<R: Registers>(
             registers: &mut R,
             id_d: RegisterId,
             id_r: RegisterId,
-        ) -> CommandResult {
+        ) -> InstructionResult {
             // それぞれの値取得
             let rd = registers.read_from(RegisterType::General { id: id_d });
             let rr = registers.read_from(RegisterType::General { id: id_r });
@@ -141,7 +141,7 @@ pub mod test_utilities {
 
             // 結果
             let result = registers.read_from(RegisterType::General { id: id_d });
-            CommandResult::new(
+            InstructionResult::new(
                 &format!(
                     "[ADD]: Add Rd({}):{} and Rr({}):{}, Result:Rd({}):{}",
                     id_d, rd, id_r, rr, id_d, result
@@ -151,11 +151,11 @@ pub mod test_utilities {
             )
         }
 
-        fn jmp<R: Registers>(registers: &mut R, val_k: RegisterSize) -> CommandResult {
+        fn jmp<R: Registers>(registers: &mut R, val_k: RegisterSize) -> InstructionResult {
             let start_program_counter = registers.read_program_counter();
             registers.update_program_counter(ProgramCounterChange::Absolute(val_k));
             let end_program_counter = registers.read_program_counter();
-            CommandResult::new(
+            InstructionResult::new(
                 &format!(
                     "[JMP]: Jump from:{} to:{}, Result:PC:{}",
                     start_program_counter, val_k, end_program_counter
@@ -174,15 +174,15 @@ mod tests {
     use crate::registers::test_utilities::*;
     use crate::registers::*;
 
-    // ---  commandの実行 ---
+    // ---  instructionの実行 ---
     #[cfg(test)]
-    mod test_command_run {
+    mod test_instruction_run {
         use super::*;
 
-        // --- commandの実行テスト ---
+        // --- instructionの実行テスト ---
         // addの実行
         #[test]
-        fn test_command_run_add() {
+        fn test_instruction_run_add() {
             let mut registers = ExampleRegisters::new();
             registers
                 .execute(RegisterOperation::Write {
@@ -193,12 +193,12 @@ mod tests {
                     register_type: RegisterType::General { id: 19 },
                     value: 22,
                 });
-            let command = ExampleCommand::Add { id_d: 14, id_r: 19 };
-            let result = command.run(&mut registers);
+            let instruction = ExampleInstruction::Add { id_d: 14, id_r: 19 };
+            let result = instruction.run(&mut registers);
 
             assert_eq!(
                 result,
-                CommandResult::new(
+                InstructionResult::new(
                     "[ADD]: Add Rd(14):33 and Rr(19):22, Result:Rd(14):55",
                     1,
                     ProgramCounterChange::Default,
@@ -208,15 +208,15 @@ mod tests {
 
         // jmpの実行
         #[test]
-        fn test_command_run_jmp() {
+        fn test_instruction_run_jmp() {
             let mut registers = ExampleRegisters::new();
             registers.update_program_counter(ProgramCounterChange::Absolute(15));
-            let command = ExampleCommand::Jmp { val_k: 1202 };
-            let result = command.run(&mut registers);
+            let instruction = ExampleInstruction::Jmp { val_k: 1202 };
+            let result = instruction.run(&mut registers);
 
             assert_eq!(
                 result,
-                CommandResult::new(
+                InstructionResult::new(
                     "[JMP]: Jump from:15 to:1202, Result:PC:1202",
                     3,
                     ProgramCounterChange::Jumped,
@@ -228,12 +228,12 @@ mod tests {
         #[test]
         fn test_empty_operation() {
             let mut registers = ExampleRegisters::new();
-            let command = ExampleCommand::Empty;
-            let result = command.run(&mut registers);
+            let instruction = ExampleInstruction::Empty;
+            let result = instruction.run(&mut registers);
 
             assert_eq!(
                 result,
-                CommandResult::new(
+                InstructionResult::new(
                     "[EMPTY]: This is empty address for instructions longer than the base instruction length",
                     0,
                     ProgramCounterChange::Default,
@@ -245,12 +245,12 @@ mod tests {
         #[test]
         fn test_nop() {
             let mut registers = ExampleRegisters::new();
-            let command = ExampleCommand::Nop;
-            let result = command.run(&mut registers);
+            let instruction = ExampleInstruction::Nop;
+            let result = instruction.run(&mut registers);
 
             assert_eq!(
                 result,
-                CommandResult::new(
+                InstructionResult::new(
                     "[NOP]: Single cycle no operation",
                     1,
                     ProgramCounterChange::Default,
@@ -260,16 +260,16 @@ mod tests {
     }
     // ---  副作用かのチェック  ---
     #[cfg(test)]
-    mod test_command_is_sideeffect {
-        use crate::command::{Command, test_utilities::ExampleCommand};
+    mod test_instruction_is_sideeffect {
+        use crate::instruction::{Instruction, test_utilities::ExampleInstruction};
 
         #[test]
         fn test_is_sideefect_default() {
-            let command_add = ExampleCommand::Add { id_d: 3, id_r: 2 };
-            let command_jmp = ExampleCommand::Jmp { val_k: 112 };
+            let instruction_add = ExampleInstruction::Add { id_d: 3, id_r: 2 };
+            let instruction_jmp = ExampleInstruction::Jmp { val_k: 112 };
 
-            assert!(!command_add.is_side_effect());
-            assert!(!command_jmp.is_side_effect());
+            assert!(!instruction_add.is_side_effect());
+            assert!(!instruction_jmp.is_side_effect());
         }
     }
 }
