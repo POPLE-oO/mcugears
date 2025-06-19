@@ -258,6 +258,7 @@ mod tests {
             );
         }
     }
+
     // ---  副作用かのチェック  ---
     #[cfg(test)]
     mod test_instruction_is_sideeffect {
@@ -270,6 +271,36 @@ mod tests {
 
             assert!(!instruction_add.is_side_effect());
             assert!(!instruction_jmp.is_side_effect());
+        }
+    }
+
+    // --- run_cycleのテスト ---
+    #[cfg(test)]
+    mod test_instruction_run_cycle {
+        use super::*;
+
+        // --- run_cycleの実行 ---
+        #[test]
+        fn test_run_cycle() {
+            let mut registers = ExampleRegisters::new();
+            registers
+                .execute(RegisterOperation::Write {
+                    register_type: RegisterType::General { id: 12 },
+                    value: 32,
+                })
+                .execute(RegisterOperation::Write {
+                    register_type: RegisterType::General { id: 17 },
+                    value: 41,
+                })
+                .update_program_counter(ProgramCounterChange::Absolute(22))
+                .update_timer(63);
+
+            let result = ExampleInstruction::Add { id_d: 12, id_r: 17 }.run_cycle(&mut registers);
+
+            assert_eq!(registers.read_from(RegisterType::General { id: 12 }), 73);
+            assert_eq!(registers.read_from(RegisterType::General { id: 17 }), 41);
+            assert_eq!(registers.read_from(RegisterType::ProgramCounter), 23);
+            assert_eq!(registers.read_from(RegisterType::Timer { id: 0 }), 1);
         }
     }
 }

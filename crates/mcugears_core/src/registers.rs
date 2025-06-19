@@ -251,7 +251,7 @@ mod tests {
         #[case(RegisterType::ProgramCounter, 101, 101)]
         #[case(RegisterType::Status { status_name: ExampleStatusType::PrescalerInterval, index: 0 }, 15, 15)]
         #[case(RegisterType::StackPointer, 22, 22)]
-        fn test_write_read_register(
+        fn test_write_read(
             #[case] register_type: RegisterType<ExampleStatusType>,
             #[case] value: RegisterSize,
             #[case] expected_value: RegisterSize,
@@ -288,7 +288,7 @@ mod tests {
         #[case(RegisterOperation::Write{register_type:RegisterType::General{id:2},value:5},RegisterType::General { id: 2 },5)]
         #[case(RegisterOperation::Add{register_type:RegisterType::General{id:21},value:100},RegisterType::General { id: 21 },130)]
         #[case(RegisterOperation::None,RegisterType::General { id: 11 },30)]
-        fn test_execute_operation(
+        fn test_execute(
             #[case] operation: RegisterOperation<ExampleStatusType>,
             #[case] register_type: RegisterType<ExampleStatusType>,
             #[case] expected_value: RegisterSize,
@@ -308,7 +308,7 @@ mod tests {
         #[case(RegisterOperation::Write{register_type:RegisterType::General{id:2},value:272},RegisterType::General { id: 2 },16)]
         #[case(RegisterOperation::Add{register_type:RegisterType::General{id:21},value:300},RegisterType::General { id: 21 },74)]
         #[case(RegisterOperation::None,RegisterType::General { id: 11 },30)]
-        fn test_execute_operation_truncation(
+        fn test_execute_truncation(
             #[case] operation: RegisterOperation<ExampleStatusType>,
             #[case] register_type: RegisterType<ExampleStatusType>,
             #[case] expected_value: RegisterSize,
@@ -323,10 +323,10 @@ mod tests {
             assert_eq!(registers.read_from(register_type), expected_value);
         }
 
-        // --- execute_operationのテスト  ---
+        // --- execute_batchのテスト  ---
         // execute_batch実行
         #[test]
-        fn test_execute_operation_batch() {
+        fn test_execute_batch() {
             let mut registers = ExampleRegisters::new();
 
             let register_type = RegisterType::General { id: 15 };
