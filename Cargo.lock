@@ -113,7 +113,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 
 [[package]]
-name = "mcugears_atmega328p"
+name = "mcugears_328p"
 version = "0.1.0"
 dependencies = [
  "mcugears_core",

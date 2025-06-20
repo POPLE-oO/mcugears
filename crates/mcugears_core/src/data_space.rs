@@ -10,33 +10,33 @@ pub trait DataSpace {
 
 // data space操作対象
 pub enum DataAddress {
-    Byte(RegisterSize),
+    Byte { address: RegisterSize },
 }
 
 #[cfg(test)]
-mod test_utilities {
+pub mod test_utilities {
     use super::*;
 
     pub struct ExampleDataSpace(Vec<u8>);
 
     impl ExampleDataSpace {
-        const DATA_SPACE_SIZE: usize = 2048;
+        const DATA_SPACE_SIZE: usize = 0x8FF;
     }
 
     impl DataSpace for ExampleDataSpace {
         fn new() -> Self {
-            Self(vec![0; Self::DATA_SPACE_SIZE])
+            Self(vec![0; Self::DATA_SPACE_SIZE + 1])
         }
 
         fn write_to(&mut self, address: DataAddress, value: RegisterSize) {
             match address {
-                DataAddress::Byte(address) => self.0[address as usize] = value as u8,
+                DataAddress::Byte { address } => self.0[address as usize] = value as u8,
             };
         }
 
         fn read_from(&self, address: DataAddress) -> RegisterSize {
             match address {
-                DataAddress::Byte(address) => self.0[address as usize] as RegisterSize,
+                DataAddress::Byte { address } => self.0[address as usize] as RegisterSize,
             }
         }
     }
@@ -56,8 +56,11 @@ mod tests {
         #[test]
         fn test_write_read() {
             let mut data_space = ExampleDataSpace::new();
-            data_space.write_to(DataAddress::Byte(510), 134);
-            assert_eq!(data_space.read_from(DataAddress::Byte(510)), 134);
+            data_space.write_to(DataAddress::Byte { address: 510 }, 134);
+            assert_eq!(
+                data_space.read_from(DataAddress::Byte { address: 510 }),
+                134
+            );
         }
     }
 }

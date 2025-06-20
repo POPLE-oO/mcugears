@@ -2,12 +2,34 @@
 
 Microcontroller emulator written in Rust.
 
+## 概要
+
+- [ ] Arduinoのエミュレータを作ってみる
+- [ ] Arduino IDEでコンパイルしたバイナリ(`.hex`)を実行する
+- [ ] バックグラウンドで複数台同時に動かしたい
+- [ ] それを通信させたい
+- [ ] 完成したら他の固定長命令のエミュレータを実装したい
+- [ ] それをtauriのバックグラウンドで動作させてロボットエミュレータを作りたい
+
 ## TODO
 
-- [ ] スタック、ヒープの実装
+- [x] レジスタの実装,テスト実装
+- [x] 命令の実装,テスト実装
+- [x] スタック、ヒープの実装, テスト実装
 - [ ] push,pop命令,alloc関係(SRAM)の実装
-- [ ] 未実装の命令を実装する(特に副作用のあるもの)
+- [ ] 未実装の命令を実装する(特に副作用(IO)のあるもの)
+- [ ] マイコン構造体の実装
 - [ ] Mcuのtest実装
+- [ ] CMPなどほかに必要そうな基本的な命令を作成
+- [ ] 簡単なアセンブリっぽくプログラムを作ってエミュレートしてみる
+- [ ] mcugears_328pの実装
+
+## 免責事項 (Disclaimer)
+
+このライブラリは、ATmega328Pマイクロコントローラのエミュレーションを目的として開発されたオープンソースプロジェクトです。
+
+本ライブラリは、Microchip Technology Inc.（旧Atmel社）によって開発、承認、または提携しているものではありません。
+「ATmega328P」はMicrochip Technology Inc.の商標です。
 
 ## プロジェクト構成
 
@@ -18,83 +40,9 @@ mcugears/               // workspace
 ├── README.md           // ← 現在の場所
 ├── crates
 │   ├── mcugears_core/  // 基本機能
-│   └── mcugears_atmega328p/   // coreをatmega328p向けに実装する
+│   └── mcugears_328p/   // coreをatmega328p向けに実装する
 ├── target/
 └── tests/              // 組み合わせテスト
-```
-
-## 概要
-
-- [ ] Arduinoのエミュレータを作ってみる
-- [ ] Arduino IDEでコンパイルしたバイナリ(`.hex`)を実行する
-- [ ] バックグラウンドで複数台同時に動かしたい
-- [ ] それを通信させたい
-- [ ] 完成したら他の固定長命令のエミュレータを実装したい
-- [ ] それをtauriのバックグラウンドで動作させてロボットエミュレータを作りたい
-
-## 構成
-
-### core
-
-基本機能
-
-- マイコンエミュ本体
-マイコンの現在のステータスを保持する構造体
-
-```rust
-struct Mcu{
-    commands: Vec<Command>      // 命令のベクトル
-    registers: Registers,       // レジスタの構造体
-    //...
-}
-```
-
-- 命令
-単一の命令のEnum
-
-```rust
-trait Command{/*略*/}
-```
-
-- レジスタの構造体
-レジスタの状態を持つ構造体
-
-```rust
-trait Registers{/*略*/}
-```
-
-### アーキテクチャごとの固有実装
-
-アーキテクチャごとの仕様を実装する
-
-- バイナリパーサー
-.hexを`Command`にパースして`CommandsIterator`を構成する
-
-- 命令(enum)
-命令の種類のEnumに`Command`を実装する
-
-```rust
-enum ExampleCommand{
-    Add(u8,u8),     // レジスタ情報など実行に必要な情報を持つ
-    //...
-}
-
-impl Command for ExampleCommand{}
-```
-
-- 命令の実装
-`Command`に`match`で実装する
-
-- レジスタ(struct)
-レジスタ構成の構造体に`Registers`を実装する
-
-```rust
-struct ExampleRegisters{
-    r: Vec<u8>,
-    //...
-}
-
-impl Registers for ExampleRegisters{}
 ```
 
 ## AVR

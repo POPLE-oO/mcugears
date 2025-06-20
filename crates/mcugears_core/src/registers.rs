@@ -35,6 +35,13 @@ pub trait Registers {
                 self.read_from(register_type).wrapping_add(value),
             ),
             RegisterOperation::None => {}
+            RegisterOperation::Sub {
+                register_type,
+                value,
+            } => self.write_to(
+                register_type,
+                self.read_from(register_type).wrapping_sub(value),
+            ),
         };
 
         self
@@ -56,7 +63,7 @@ pub trait Registers {
         self.read_from(RegisterType::ProgramCounter)
     }
 
-    // プログラムカウンター(命令アドレス)を更新して、更新後の値を返す
+    // プログラムカウンター(命令アドレス)を更新
     fn update_program_counter(&mut self, program_couter_change: ProgramCounterChange) -> &mut Self {
         // プログラムカウンター更新
         let register_operation = match program_couter_change {
@@ -78,6 +85,15 @@ pub trait Registers {
 
         self
     }
+
+    // スタックポインターの値を返す
+    fn read_stack_pointer(&self) -> RegisterSize {
+        // 現在の値
+        self.read_from(RegisterType::StackPointer)
+    }
+
+    // スタックポインターの更新
+    fn write_stack_pointer(&mut self, stack_pointer_change: StackPointerChange) -> &mut Self;
 }
 
 // レジスタの種類(クエリ)
@@ -98,13 +114,35 @@ pub enum RegisterOperation<S> {
         register_type: RegisterType<S>, // レジスタ指定
         value: RegisterSize,            // 変更する値
     },
-    //加算
+    // 加算
     Add {
         register_type: RegisterType<S>,
         value: RegisterSize, // 追加する値
     },
+    // 減算
+    Sub {
+        register_type: RegisterType<S>,
+        value: RegisterSize, // 減算する値
+    },
     // 何もしない
     None,
+}
+
+// プログラムカウンター(命令アドレス)の更新方法
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProgramCounterChange {
+    Default,                // PCをインクリメント(PC←PC+1)
+    Absolute(RegisterSize), // 絶対アドレス(直接目標のアドレスへ)
+    Relative(RegisterSize), // 相対アドレス(現在のアドレスからの変化量)
+    Jumped,                 // ジャンプ済み(更新済み)
+}
+
+// スタックポインターの変更方法
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StackPointerChange {
+    Default,                // SPをデクリメント(PC←PC-1)(下方伸張の場合)
+    Absolute(RegisterSize), // 絶対アドレス(直接目標のアドレスへ)
+    Relative(RegisterSize), // 相対アドレス(現在のアドレスからの変化量)
 }
 
 #[cfg(test)]
@@ -230,6 +268,27 @@ pub mod test_utilities {
 
             self
         }
+
+        fn write_stack_pointer(&mut self, stack_pointer_change: StackPointerChange) -> &mut Self {
+            // プログラムカウンター更新
+            let register_operation = match stack_pointer_change {
+                StackPointerChange::Default => RegisterOperation::Sub {
+                    register_type: RegisterType::StackPointer,
+                    value: 1,
+                },
+                StackPointerChange::Absolute(address) => RegisterOperation::Write {
+                    register_type: RegisterType::StackPointer,
+                    value: address,
+                },
+                StackPointerChange::Relative(change) => RegisterOperation::Sub {
+                    register_type: RegisterType::StackPointer,
+                    value: change,
+                },
+            };
+            self.execute(register_operation);
+
+            self
+        }
     }
 }
 
@@ -287,6 +346,7 @@ mod tests {
         #[rstest]
         #[case(RegisterOperation::Write{register_type:RegisterType::General{id:2},value:5},RegisterType::General { id: 2 },5)]
         #[case(RegisterOperation::Add{register_type:RegisterType::General{id:21},value:100},RegisterType::General { id: 21 },130)]
+        #[case(RegisterOperation::Sub{register_type:RegisterType::General{id:13},value:5},RegisterType::General { id: 13 },25)]
         #[case(RegisterOperation::None,RegisterType::General { id: 11 },30)]
         fn test_execute(
             #[case] operation: RegisterOperation<ExampleStatusType>,
@@ -391,10 +451,10 @@ mod tests {
 
     // --- read_program_counter, update_program_counterのテスト ---
     #[cfg(test)]
-    mod test_registers_read_program_counter {
+    mod test_registers_read_update_program_counter {
         use super::*;
 
-        // ---  read_program_counterのテスト  ---
+        // ---  read, updateのテスト  ---
         #[rstest]
         #[case(ProgramCounterChange::Absolute(121), 121)]
         #[case(ProgramCounterChange::Default, 21)]
@@ -410,6 +470,29 @@ mod tests {
             registers.update_program_counter(program_counter_change);
 
             assert_eq!(registers.read_program_counter(), expected_value);
+        }
+    }
+
+    // --- read_stack_pointer, write_stack_pointerのテスト ---
+    #[cfg(test)]
+    mod test_registers_read_write_stack_pointer {
+        use super::*;
+
+        // ---  read, updateのテスト  ---
+        #[rstest]
+        #[case(StackPointerChange::Absolute(0x401), 0x401)]
+        #[case(StackPointerChange::Default, 0x7FF)]
+        #[case(StackPointerChange::Relative(10), 0x7F6)]
+        fn test_read_write_stack_pointer(
+            #[case] stack_pointer_change: StackPointerChange,
+            #[case] expected_value: RegisterSize,
+        ) {
+            let mut registers = ExampleRegisters::new();
+
+            registers.write_stack_pointer(StackPointerChange::Absolute(0x800));
+            registers.write_stack_pointer(stack_pointer_change);
+
+            assert_eq!(registers.read_stack_pointer(), expected_value);
         }
     }
 

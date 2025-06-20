@@ -5,12 +5,20 @@ use std::fmt::Debug;
 // 一つの命令(命令の種類のEnum)の振る舞い
 pub trait Instruction: Copy {
     // 命令を実行
-    fn run<R: Registers>(&self, registers: &mut R) -> InstructionResult;
+    fn run<R: Registers, D: DataSpace>(
+        &self,
+        registers: &mut R,
+        data_space: &mut D,
+    ) -> InstructionResult;
 
     // 一つの命令から実行、レジスタ更新までの流れ
-    fn run_cycle<R: Registers>(&self, registers: &mut R) -> String {
+    fn run_cycle<R: Registers, D: DataSpace>(
+        &self,
+        registers: &mut R,
+        data_space: &mut D,
+    ) -> String {
         // 命令実行
-        let result = self.run(registers);
+        let result = self.run(registers, data_space);
 
         registers
             // タイマーアップデート
@@ -57,15 +65,6 @@ pub struct InstructionResult {
     program_counter_change: ProgramCounterChange, // プログラムカウンタ更新情報
 }
 
-// プログラムカウンター(命令アドレス)の更新方法
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ProgramCounterChange {
-    Default,                // PCをインクリメント(PC←PC+1)
-    Absolute(RegisterSize), // 絶対アドレス(直接目標のアドレスへ)
-    Relative(RegisterSize), // 相対アドレス(現在のアドレスからの変化量)
-    Jumped,                 // ジャンプ済み(更新済み)
-}
-
 impl InstructionResult {
     pub fn new(
         debug_info: &str,
@@ -99,26 +98,29 @@ pub mod test_utilities {
     pub enum ExampleInstruction {
         Add { id_d: RegisterId, id_r: RegisterId },
         Jmp { val_k: RegisterSize },
+        Push { id_d: RegisterId },
         Nop,
         Empty,
     }
 
     impl Instruction for ExampleInstruction {
-        fn run<R: Registers>(&self, registers: &mut R) -> InstructionResult {
+        fn run<R: Registers, D: DataSpace>(
+            &self,
+            registers: &mut R,
+            data_space: &mut D,
+        ) -> InstructionResult {
             match self {
                 ExampleInstruction::Add { id_d, id_r } => Self::add(registers, *id_d, *id_r),
                 ExampleInstruction::Jmp { val_k } => Self::jmp(registers, *val_k),
                 ExampleInstruction::Empty => Self::empty_operation(),
                 ExampleInstruction::Nop => Self::nop(),
+                ExampleInstruction::Push { id_d } => Self::push(registers, data_space, *id_d),
             }
         }
 
         fn is_side_effect(&self) -> bool {
             match self {
-                ExampleInstruction::Add { id_d: _, id_r: _ } => false,
-                ExampleInstruction::Jmp { val_k: _ } => false,
-                ExampleInstruction::Empty => false,
-                ExampleInstruction::Nop => false,
+                _ => false,
             }
         }
     }
@@ -164,6 +166,31 @@ pub mod test_utilities {
                 ProgramCounterChange::Jumped,
             )
         }
+
+        fn push<R: Registers, D: DataSpace>(
+            registers: &mut R,
+            data_space: &mut D,
+            id_d: RegisterId,
+        ) -> InstructionResult {
+            // スタックへ書き込み
+            let rd = registers.read_from(RegisterType::General { id: id_d });
+            let address = registers.read_stack_pointer();
+            data_space.write_to(DataAddress::Byte { address }, rd);
+
+            // スタックポインター更新
+            registers.write_stack_pointer(StackPointerChange::Default);
+
+            let stack_value = data_space.read_from(DataAddress::Byte { address });
+            // result
+            InstructionResult::new(
+                &format!(
+                    "[PUSH]: Push Rd({}):{}, Result:Stack({:X}):{}",
+                    id_d, rd, address, stack_value
+                ),
+                2,
+                ProgramCounterChange::Default,
+            )
+        }
     }
 }
 
@@ -171,6 +198,8 @@ pub mod test_utilities {
 mod tests {
     use super::test_utilities::*;
     use super::*;
+    use crate::data_space::test_utilities::*;
+    use crate::data_space::*;
     use crate::registers::test_utilities::*;
     use crate::registers::*;
 
@@ -184,6 +213,7 @@ mod tests {
         #[test]
         fn test_instruction_run_add() {
             let mut registers = ExampleRegisters::new();
+            let mut data_space = ExampleDataSpace::new();
             registers
                 .execute(RegisterOperation::Write {
                     register_type: RegisterType::General { id: 14 },
@@ -194,7 +224,7 @@ mod tests {
                     value: 22,
                 });
             let instruction = ExampleInstruction::Add { id_d: 14, id_r: 19 };
-            let result = instruction.run(&mut registers);
+            let result = instruction.run(&mut registers, &mut data_space);
 
             assert_eq!(
                 result,
@@ -210,9 +240,10 @@ mod tests {
         #[test]
         fn test_instruction_run_jmp() {
             let mut registers = ExampleRegisters::new();
+            let mut data_space = ExampleDataSpace::new();
             registers.update_program_counter(ProgramCounterChange::Absolute(15));
             let instruction = ExampleInstruction::Jmp { val_k: 1202 };
-            let result = instruction.run(&mut registers);
+            let result = instruction.run(&mut registers, &mut data_space);
 
             assert_eq!(
                 result,
@@ -228,8 +259,9 @@ mod tests {
         #[test]
         fn test_empty_operation() {
             let mut registers = ExampleRegisters::new();
+            let mut data_space = ExampleDataSpace::new();
             let instruction = ExampleInstruction::Empty;
-            let result = instruction.run(&mut registers);
+            let result = instruction.run(&mut registers, &mut data_space);
 
             assert_eq!(
                 result,
@@ -245,8 +277,9 @@ mod tests {
         #[test]
         fn test_nop() {
             let mut registers = ExampleRegisters::new();
+            let mut data_space = ExampleDataSpace::new();
             let instruction = ExampleInstruction::Nop;
-            let result = instruction.run(&mut registers);
+            let result = instruction.run(&mut registers, &mut data_space);
 
             assert_eq!(
                 result,
@@ -256,6 +289,32 @@ mod tests {
                     ProgramCounterChange::Default,
                 )
             );
+        }
+
+        // pushの実行
+        #[test]
+        fn test_push() {
+            let mut registers = ExampleRegisters::new();
+            registers
+                .execute(RegisterOperation::Write {
+                    register_type: RegisterType::General { id: 22 },
+                    value: 57,
+                })
+                .write_stack_pointer(StackPointerChange::Absolute(0x8FF));
+            let mut data_space = ExampleDataSpace::new();
+
+            let instruction = ExampleInstruction::Push { id_d: 22 };
+            let result = instruction.run(&mut registers, &mut data_space);
+
+            assert_eq!(
+                result,
+                InstructionResult::new(
+                    "[PUSH]: Push Rd(22):57, Result:Stack(8FF):57",
+                    2,
+                    ProgramCounterChange::Default
+                )
+            );
+            assert_eq!(registers.read_from(RegisterType::StackPointer), 0x8FE);
         }
     }
 
@@ -283,6 +342,7 @@ mod tests {
         #[test]
         fn test_run_cycle() {
             let mut registers = ExampleRegisters::new();
+            let mut data_space = ExampleDataSpace::new();
             registers
                 .execute(RegisterOperation::Write {
                     register_type: RegisterType::General { id: 12 },
@@ -295,7 +355,8 @@ mod tests {
                 .update_program_counter(ProgramCounterChange::Absolute(22))
                 .update_timer(63);
 
-            ExampleInstruction::Add { id_d: 12, id_r: 17 }.run_cycle(&mut registers);
+            ExampleInstruction::Add { id_d: 12, id_r: 17 }
+                .run_cycle(&mut registers, &mut data_space);
 
             assert_eq!(registers.read_from(RegisterType::General { id: 12 }), 73);
             assert_eq!(registers.read_from(RegisterType::General { id: 17 }), 41);
