@@ -61,14 +61,14 @@ pub trait Instruction: Copy {
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstructionResult {
     debug_info: String,                           // 実行した命令の詳細(デバック用)
-    clocks: RegisterSize,                         // 実行クロック
+    clocks: RegisterOperateValue,                 // 実行クロック
     program_counter_change: ProgramCounterChange, // プログラムカウンタ更新情報
 }
 
 impl InstructionResult {
     pub fn new(
         debug_info: &str,
-        clocks: RegisterSize,
+        clocks: RegisterOperateValue,
         pc_change: ProgramCounterChange,
     ) -> InstructionResult {
         InstructionResult {
@@ -80,7 +80,7 @@ impl InstructionResult {
     pub fn debug_info(self) -> String {
         self.debug_info
     }
-    pub fn clocks(&self) -> RegisterSize {
+    pub fn clocks(&self) -> RegisterOperateValue {
         self.clocks
     }
     pub fn program_couter_change(&self) -> ProgramCounterChange {
@@ -92,13 +92,14 @@ impl InstructionResult {
 pub mod test_utilities {
 
     use super::*;
-    use crate::{RegisterId, RegisterSize};
+    use crate::{RegisterId, RegisterOperateValue};
 
     #[derive(Debug, Clone, Copy)]
     pub enum ExampleInstruction {
         Add { id_d: RegisterId, id_r: RegisterId },
-        Jmp { val_k: RegisterSize },
+        Jmp { val_k: RegisterOperateValue },
         Push { id_d: RegisterId },
+        Pop { id_d: RegisterId },
         Nop,
         Empty,
     }
@@ -115,6 +116,7 @@ pub mod test_utilities {
                 ExampleInstruction::Empty => Self::empty_operation(),
                 ExampleInstruction::Nop => Self::nop(),
                 ExampleInstruction::Push { id_d } => Self::push(registers, data_space, *id_d),
+                ExampleInstruction::Pop { id_d } => Self::pop(registers, data_space, *id_d),
             }
         }
 
@@ -153,7 +155,7 @@ pub mod test_utilities {
             )
         }
 
-        fn jmp<R: Registers>(registers: &mut R, val_k: RegisterSize) -> InstructionResult {
+        fn jmp<R: Registers>(registers: &mut R, val_k: RegisterOperateValue) -> InstructionResult {
             let start_program_counter = registers.read_program_counter();
             registers.update_program_counter(ProgramCounterChange::Absolute(val_k));
             let end_program_counter = registers.read_program_counter();
@@ -178,14 +180,44 @@ pub mod test_utilities {
             data_space.write_to(DataAddress::Byte { address }, rd);
 
             // スタックポインター更新
-            registers.write_stack_pointer(StackPointerChange::Default);
+            registers.write_stack_pointer(StackPointerChange::Push);
 
-            let stack_value = data_space.read_from(DataAddress::Byte { address });
             // result
+            let stack_value = data_space.read_from(DataAddress::Byte { address });
             InstructionResult::new(
                 &format!(
                     "[PUSH]: Push Rd({}):{}, Result:Stack({:X}):{}",
                     id_d, rd, address, stack_value
+                ),
+                2,
+                ProgramCounterChange::Default,
+            )
+        }
+
+        fn pop<R: Registers, D: DataSpace>(
+            registers: &mut R,
+            data_space: &mut D,
+            id_d: RegisterId,
+        ) -> InstructionResult {
+            // スタックポインター更新
+            registers.write_stack_pointer(StackPointerChange::Pop);
+
+            // スタックからの読み込み
+            let address = registers.read_stack_pointer();
+            let value = data_space.read_from(DataAddress::Byte { address });
+
+            // レジスタへ書き込み
+            registers.execute(RegisterOperation::Write {
+                register_type: RegisterType::General { id: id_d },
+                value,
+            });
+
+            // result
+            let register_value = registers.read_from(RegisterType::General { id: id_d });
+            InstructionResult::new(
+                &format!(
+                    "[POP]: Pop Stack({:X}):{}, Result:Rd({}):{}",
+                    address, value, id_d, register_value
                 ),
                 2,
                 ProgramCounterChange::Default,
@@ -315,6 +347,40 @@ mod tests {
                 )
             );
             assert_eq!(registers.read_from(RegisterType::StackPointer), 0x8FE);
+        }
+
+        // popの実行
+        #[test]
+        fn test_pop() {
+            // 初期設定
+            let mut registers = ExampleRegisters::new();
+            registers
+                .write_stack_pointer(StackPointerChange::Absolute(0x8FF))
+                .execute(RegisterOperation::Write {
+                    register_type: RegisterType::General { id: 19 },
+                    value: 136,
+                })
+                .execute(RegisterOperation::Write {
+                    register_type: RegisterType::General { id: 13 },
+                    value: 220,
+                });
+            let mut data_space = ExampleDataSpace::new();
+            ExampleInstruction::Push { id_d: 13 }.run(&mut registers, &mut data_space);
+
+            // 命令実行
+            let instruction = ExampleInstruction::Pop { id_d: 19 };
+            let result = instruction.run(&mut registers, &mut data_space);
+
+            // test
+            assert_eq!(
+                result,
+                InstructionResult::new(
+                    "[POP]: Pop Stack(8FF):220, Result:Rd(19):220",
+                    2,
+                    ProgramCounterChange::Default
+                )
+            );
+            assert_eq!(registers.read_from(RegisterType::StackPointer), 0x8FF);
         }
     }
 

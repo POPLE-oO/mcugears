@@ -16,8 +16,18 @@ Microcontroller emulator written in Rust.
 - [x] レジスタの実装,テスト実装
 - [x] 命令の実装,テスト実装
 - [x] スタック、ヒープの実装, テスト実装
-- [ ] push,pop命令,alloc関係(SRAM)の実装
+- [ ] push(o),pop命令(o),alloc関係(x)(SRAM)の実装
 - [ ] 未実装の命令を実装する(特に副作用(IO)のあるもの)
+- [ ] 命令の実装
+  - [x] ADD
+  - [x] JMP
+  - [x] PUSH
+  - [x] POP
+  - [x] NOP
+  - [x] EMPTY(2x16bitの命令を[命令, EMPTY]と表す用)
+  - [x] EMPTY(2x16bitの命令を[命令, EMPTY]と表す用)
+  - [ ] MV
+  - [ ] CMP
 - [ ] マイコン構造体の実装
 - [ ] Mcuのtest実装
 - [ ] CMPなどほかに必要そうな基本的な命令を作成

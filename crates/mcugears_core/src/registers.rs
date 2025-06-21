@@ -4,7 +4,7 @@ use core::fmt::Debug;
 
 // 既定の型
 pub type RegisterId = u8; // レジスタのidを格納するための型
-pub type RegisterSize = u64; // レジスタの最大サイズ
+pub type RegisterOperateValue = i64; // レジスタ操作変数の型
 
 // レジスタ構造体の振る舞い
 pub trait Registers {
@@ -15,10 +15,14 @@ pub trait Registers {
     fn new() -> Self;
 
     // 値の設定
-    fn write_to(&mut self, register_type: RegisterType<Self::StatusType>, value: RegisterSize);
+    fn write_to(
+        &mut self,
+        register_type: RegisterType<Self::StatusType>,
+        value: RegisterOperateValue,
+    );
 
     // 値取得
-    fn read_from(&self, register_type: RegisterType<Self::StatusType>) -> RegisterSize;
+    fn read_from(&self, register_type: RegisterType<Self::StatusType>) -> RegisterOperateValue;
 
     // レジスタの変更操作を受け取り変更をする
     fn execute(&mut self, operation: RegisterOperation<Self::StatusType>) -> &mut Self {
@@ -35,13 +39,6 @@ pub trait Registers {
                 self.read_from(register_type).wrapping_add(value),
             ),
             RegisterOperation::None => {}
-            RegisterOperation::Sub {
-                register_type,
-                value,
-            } => self.write_to(
-                register_type,
-                self.read_from(register_type).wrapping_sub(value),
-            ),
         };
 
         self
@@ -55,10 +52,10 @@ pub trait Registers {
     }
 
     // タイマーを更新
-    fn update_timer(&mut self, clocks: RegisterSize) -> &mut Self;
+    fn update_timer(&mut self, clocks: RegisterOperateValue) -> &mut Self;
 
     // プログラムカウンター(命令アドレス)の値を返す
-    fn read_program_counter(&self) -> RegisterSize {
+    fn read_program_counter(&self) -> RegisterOperateValue {
         // 現在の値を返す
         self.read_from(RegisterType::ProgramCounter)
     }
@@ -87,7 +84,7 @@ pub trait Registers {
     }
 
     // スタックポインターの値を返す
-    fn read_stack_pointer(&self) -> RegisterSize {
+    fn read_stack_pointer(&self) -> RegisterOperateValue {
         // 現在の値
         self.read_from(RegisterType::StackPointer)
     }
@@ -112,17 +109,12 @@ pub enum RegisterOperation<S> {
     //書き込み
     Write {
         register_type: RegisterType<S>, // レジスタ指定
-        value: RegisterSize,            // 変更する値
+        value: RegisterOperateValue,    // 変更する値
     },
     // 加算
     Add {
         register_type: RegisterType<S>,
-        value: RegisterSize, // 追加する値
-    },
-    // 減算
-    Sub {
-        register_type: RegisterType<S>,
-        value: RegisterSize, // 減算する値
+        value: RegisterOperateValue, // 追加する値
     },
     // 何もしない
     None,
@@ -131,18 +123,19 @@ pub enum RegisterOperation<S> {
 // プログラムカウンター(命令アドレス)の更新方法
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ProgramCounterChange {
-    Default,                // PCをインクリメント(PC←PC+1)
-    Absolute(RegisterSize), // 絶対アドレス(直接目標のアドレスへ)
-    Relative(RegisterSize), // 相対アドレス(現在のアドレスからの変化量)
-    Jumped,                 // ジャンプ済み(更新済み)
+    Default,                        // PCをインクリメント(PC←PC+1)
+    Absolute(RegisterOperateValue), // 絶対アドレス(直接目標のアドレスへ)
+    Relative(RegisterOperateValue), // 相対アドレス(現在のアドレスからの変化量)
+    Jumped,                         // ジャンプ済み(更新済み)
 }
 
 // スタックポインターの変更方法
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum StackPointerChange {
-    Default,                // SPをデクリメント(PC←PC-1)(下方伸張の場合)
-    Absolute(RegisterSize), // 絶対アドレス(直接目標のアドレスへ)
-    Relative(RegisterSize), // 相対アドレス(現在のアドレスからの変化量)
+    Push,                           // SPをデクリメント(PC←PC-1)(下方伸張の場合)
+    Pop,                            // SPをインクリメント(PC←PC+1)(下方伸張の場合)
+    Absolute(RegisterOperateValue), // 絶対アドレス(直接目標のアドレスへ)
+    Relative(RegisterOperateValue), // 相対アドレス(現在のアドレスからの変化量)
 }
 
 #[cfg(test)]
@@ -192,7 +185,11 @@ pub mod test_utilities {
             Self::default()
         }
 
-        fn write_to(&mut self, register_type: RegisterType<Self::StatusType>, value: RegisterSize) {
+        fn write_to(
+            &mut self,
+            register_type: RegisterType<Self::StatusType>,
+            value: RegisterOperateValue,
+        ) {
             match register_type {
                 RegisterType::General { id } => {
                     self.general[id as usize] = value as register_size::General
@@ -215,21 +212,21 @@ pub mod test_utilities {
             }
         }
 
-        fn read_from(&self, register_type: RegisterType<Self::StatusType>) -> RegisterSize {
+        fn read_from(&self, register_type: RegisterType<Self::StatusType>) -> RegisterOperateValue {
             match register_type {
-                RegisterType::General { id } => self.general[id as usize] as RegisterSize,
-                RegisterType::Timer { id } => self.timer[id as usize] as RegisterSize,
-                RegisterType::ProgramCounter => self.program_counter as RegisterSize,
+                RegisterType::General { id } => self.general[id as usize] as RegisterOperateValue,
+                RegisterType::Timer { id } => self.timer[id as usize] as RegisterOperateValue,
+                RegisterType::ProgramCounter => self.program_counter as RegisterOperateValue,
                 RegisterType::Status { status_name, index } => match status_name {
                     ExampleStatusType::PrescalerInterval => {
-                        self.other_status.prescaler_interval[index as usize] as RegisterSize
+                        self.other_status.prescaler_interval[index as usize] as RegisterOperateValue
                     }
                 },
-                RegisterType::StackPointer => self.stack_pointer as RegisterSize,
+                RegisterType::StackPointer => self.stack_pointer as RegisterOperateValue,
             }
         }
 
-        fn update_timer(&mut self, clocks: RegisterSize) -> &mut Self {
+        fn update_timer(&mut self, clocks: RegisterOperateValue) -> &mut Self {
             // プリスケーラ定義(仮)
             let prescalers = [64];
 
@@ -272,15 +269,19 @@ pub mod test_utilities {
         fn write_stack_pointer(&mut self, stack_pointer_change: StackPointerChange) -> &mut Self {
             // プログラムカウンター更新
             let register_operation = match stack_pointer_change {
-                StackPointerChange::Default => RegisterOperation::Sub {
+                StackPointerChange::Pop => RegisterOperation::Add {
                     register_type: RegisterType::StackPointer,
                     value: 1,
+                },
+                StackPointerChange::Push => RegisterOperation::Add {
+                    register_type: RegisterType::StackPointer,
+                    value: -1,
                 },
                 StackPointerChange::Absolute(address) => RegisterOperation::Write {
                     register_type: RegisterType::StackPointer,
                     value: address,
                 },
-                StackPointerChange::Relative(change) => RegisterOperation::Sub {
+                StackPointerChange::Relative(change) => RegisterOperation::Add {
                     register_type: RegisterType::StackPointer,
                     value: change,
                 },
@@ -312,8 +313,8 @@ mod tests {
         #[case(RegisterType::StackPointer, 22, 22)]
         fn test_write_read(
             #[case] register_type: RegisterType<ExampleStatusType>,
-            #[case] value: RegisterSize,
-            #[case] expected_value: RegisterSize,
+            #[case] value: RegisterOperateValue,
+            #[case] expected_value: RegisterOperateValue,
         ) {
             let mut registers = ExampleRegisters::new();
             registers.write_to(register_type, value);
@@ -329,8 +330,8 @@ mod tests {
         #[case(RegisterType::StackPointer, 74223, 8687)]
         fn test_set_register_truncation(
             #[case] register_type: RegisterType<ExampleStatusType>,
-            #[case] value: RegisterSize,
-            #[case] expected_truncated_value: RegisterSize,
+            #[case] value: RegisterOperateValue,
+            #[case] expected_truncated_value: RegisterOperateValue,
         ) {
             let mut registers = ExampleRegisters::new();
             registers.write_to(register_type, value);
@@ -346,12 +347,11 @@ mod tests {
         #[rstest]
         #[case(RegisterOperation::Write{register_type:RegisterType::General{id:2},value:5},RegisterType::General { id: 2 },5)]
         #[case(RegisterOperation::Add{register_type:RegisterType::General{id:21},value:100},RegisterType::General { id: 21 },130)]
-        #[case(RegisterOperation::Sub{register_type:RegisterType::General{id:13},value:5},RegisterType::General { id: 13 },25)]
         #[case(RegisterOperation::None,RegisterType::General { id: 11 },30)]
         fn test_execute(
             #[case] operation: RegisterOperation<ExampleStatusType>,
             #[case] register_type: RegisterType<ExampleStatusType>,
-            #[case] expected_value: RegisterSize,
+            #[case] expected_value: RegisterOperateValue,
         ) {
             let mut registers = ExampleRegisters::new();
             registers
@@ -371,7 +371,7 @@ mod tests {
         fn test_execute_truncation(
             #[case] operation: RegisterOperation<ExampleStatusType>,
             #[case] register_type: RegisterType<ExampleStatusType>,
-            #[case] expected_value: RegisterSize,
+            #[case] expected_value: RegisterOperateValue,
         ) {
             let mut registers = ExampleRegisters::new();
             registers
@@ -462,7 +462,7 @@ mod tests {
         #[case(ProgramCounterChange::Jumped, 20)]
         fn test_read_update_program_counter(
             #[case] program_counter_change: ProgramCounterChange,
-            #[case] expected_value: RegisterSize,
+            #[case] expected_value: RegisterOperateValue,
         ) {
             let mut registers = ExampleRegisters::new();
 
@@ -481,11 +481,12 @@ mod tests {
         // ---  read, updateのテスト  ---
         #[rstest]
         #[case(StackPointerChange::Absolute(0x401), 0x401)]
-        #[case(StackPointerChange::Default, 0x7FF)]
-        #[case(StackPointerChange::Relative(10), 0x7F6)]
+        #[case(StackPointerChange::Push, 0x7FF)]
+        #[case(StackPointerChange::Pop, 0x801)]
+        #[case(StackPointerChange::Relative(-10), 0x7F6)]
         fn test_read_write_stack_pointer(
             #[case] stack_pointer_change: StackPointerChange,
-            #[case] expected_value: RegisterSize,
+            #[case] expected_value: RegisterOperateValue,
         ) {
             let mut registers = ExampleRegisters::new();
 

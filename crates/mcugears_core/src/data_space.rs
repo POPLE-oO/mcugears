@@ -4,13 +4,13 @@ use crate::*;
 // DataSpace操作
 pub trait DataSpace {
     fn new() -> Self;
-    fn write_to(&mut self, address: DataAddress, value: RegisterSize);
-    fn read_from(&self, address: DataAddress) -> RegisterSize;
+    fn write_to(&mut self, address: DataAddress, value: RegisterOperateValue);
+    fn read_from(&self, address: DataAddress) -> RegisterOperateValue;
 }
 
 // data space操作対象
 pub enum DataAddress {
-    Byte { address: RegisterSize },
+    Byte { address: RegisterOperateValue },
 }
 
 #[cfg(test)]
@@ -28,15 +28,15 @@ pub mod test_utilities {
             Self(vec![0; Self::DATA_SPACE_SIZE + 1])
         }
 
-        fn write_to(&mut self, address: DataAddress, value: RegisterSize) {
+        fn write_to(&mut self, address: DataAddress, value: RegisterOperateValue) {
             match address {
                 DataAddress::Byte { address } => self.0[address as usize] = value as u8,
             };
         }
 
-        fn read_from(&self, address: DataAddress) -> RegisterSize {
+        fn read_from(&self, address: DataAddress) -> RegisterOperateValue {
             match address {
-                DataAddress::Byte { address } => self.0[address as usize] as RegisterSize,
+                DataAddress::Byte { address } => self.0[address as usize] as RegisterOperateValue,
             }
         }
     }
