@@ -3,9 +3,7 @@ trait Registers {
     // 初期化
     fn new() -> Self;
     // 書き込み
-    fn write_to<V>(&mut self, register_type: RegisterType, value: V) -> &mut Self
-    where
-        V: Into<u8> + Into<u16>;
+    fn write_to(&mut self, register_type: RegisterType, value: usize) -> &mut Self;
     // 読み込み
     fn read_from(&self, register_type: RegisterType) -> usize;
 }
@@ -50,17 +48,14 @@ mod registers_tests {
         }
 
         // レジスタ書き込み
-        fn write_to<V>(&mut self, register_type: RegisterType, value: V) -> &mut Self
-        where
-            V: Into<u8> + Into<u16>,
-        {
+        fn write_to(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
             // 書き込み
             match register_type {
-                RegisterType::General { id } => self.general[id] = value.into(),
-                RegisterType::Status => self.status = value.into(),
-                RegisterType::StackPointer => self.stack_pointer = value.into(),
-                RegisterType::ProgramCounter => self.program_counter = value.into(),
-                RegisterType::Io { id } => self.io[id] = value.into(),
+                RegisterType::General { id } => self.general[id] = value as u8,
+                RegisterType::Status => self.status = value as u8,
+                RegisterType::StackPointer => self.stack_pointer = value as u16,
+                RegisterType::ProgramCounter => self.program_counter = value as u16,
+                RegisterType::Io { id } => self.io[id] = value as u8,
             }
 
             self
@@ -105,6 +100,8 @@ mod registers_tests {
     #[cfg(test)]
     mod operation {
 
+        use rstest::rstest;
+
         use super::*;
 
         // 書き込み
@@ -118,17 +115,17 @@ mod registers_tests {
             registers.write_to(register_type, 140);
 
             // 想定している結果
-            let mut result = ExampleRegisters {
+            let mut expected = ExampleRegisters {
                 general: [0; 32],
                 status: 0,
                 stack_pointer: 0,
                 program_counter: 0,
                 io: [0; 256],
             };
-            result.general[14] = 140;
+            expected.general[14] = 140;
 
             // テスト
-            assert_eq!(registers, result);
+            assert_eq!(registers, expected);
         }
 
         // 読み取り
@@ -144,6 +141,26 @@ mod registers_tests {
 
             // テスト
             assert_eq!(value, 24);
+        }
+
+        // 様々なレジスタの種類の読み書きに対応
+        #[rstest]
+        #[case::general(RegisterType::General{id:2}, 200)]
+        #[case::status(RegisterType::Status, 121)]
+        #[case::stack_pointer(RegisterType::StackPointer, 528)]
+        #[case::program_counter(RegisterType::ProgramCounter, 1204)]
+        #[case::io(RegisterType::Io{id:105}, 21)]
+        fn write_read_variously(#[case] register_type: RegisterType, #[case] value: usize) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+
+            //書き込み,読み込み
+            let result = registers
+                .write_to(register_type, value)
+                .read_from(register_type);
+
+            // テスト
+            assert_eq!(result, value);
         }
     }
 }
