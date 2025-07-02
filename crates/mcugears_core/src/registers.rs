@@ -162,5 +162,50 @@ mod registers_tests {
             // テスト
             assert_eq!(result, value);
         }
+
+        // 境界上の読み書きテスト
+        #[rstest]
+        #[case::general_min(RegisterType::General{id:0}, 12)]
+        #[case::general_max(RegisterType::General{id:31}, 42)]
+        #[case::io_min(RegisterType::Io{id:0}, 110)]
+        #[case::io_max(RegisterType::Io{id:255}, 223)]
+        fn read_write_on_boundary(#[case] register_type: RegisterType, #[case] value: usize) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+
+            //書き込み,読み込み
+            let result = registers
+                .write_to(register_type, value)
+                .read_from(register_type);
+
+            // テスト
+            assert_eq!(result, value);
+        }
+
+        // 境界外の書きテスト
+        #[rstest]
+        #[case::general_max(RegisterType::General{id:32}, 117)]
+        #[case::io_max(RegisterType::Io{id:256}, 98)]
+        #[should_panic]
+        fn write_out_of_boundary(#[case] register_type: RegisterType, #[case] value: usize) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+
+            //書き込み
+            registers.write_to(register_type, value);
+        }
+
+        // 境界外の読みテスト
+        #[rstest]
+        #[case::general_max(RegisterType::General{id:32})]
+        #[case::io_max(RegisterType::Io{id:256})]
+        #[should_panic]
+        fn read_out_of_boundary(#[case] register_type: RegisterType) {
+            // 初期化
+            let registers = ExampleRegisters::new();
+
+            //読み込み
+            registers.read_from(register_type);
+        }
     }
 }
