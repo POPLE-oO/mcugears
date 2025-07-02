@@ -96,13 +96,11 @@ mod registers_tests {
         }
     }
 
-    // レジスタ操作
+    // 読み書き操作テスト
     #[cfg(test)]
-    mod operation {
-
-        use rstest::rstest;
-
+    mod read_write {
         use super::*;
+        use rstest::rstest;
 
         // 書き込み
         #[test]
@@ -206,6 +204,30 @@ mod registers_tests {
 
             //読み込み
             registers.read_from(register_type);
+        }
+
+        // 切り捨て処理
+        #[rstest]
+        #[case::general(RegisterType::General{id:22}, 310, 54)]
+        #[case::status(RegisterType::Status, 288, 32)]
+        #[case::stack_pointer(RegisterType::StackPointer, 65635, 99)]
+        #[case::program_counter(RegisterType::ProgramCounter, 66222, 686)]
+        #[case::io(RegisterType::Io{id:28}, 400, 144)]
+        fn write_read_truncation(
+            #[case] register_type: RegisterType,
+            #[case] value: usize,
+            #[case] expected: usize,
+        ) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+
+            //書き込み,読み込み
+            let result = registers
+                .write_to(register_type, value)
+                .read_from(register_type);
+
+            // テスト
+            assert_eq!(result, expected);
         }
     }
 }
