@@ -6,6 +6,14 @@ trait Registers {
     fn write_to(&mut self, register_type: RegisterType, value: usize) -> &mut Self;
     // 読み込み
     fn read_from(&self, register_type: RegisterType) -> usize;
+
+    // 加算
+    fn add_to(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
+        // 加算
+        self.write_to(register_type, self.read_from(register_type) + value);
+
+        self
+    }
 }
 
 // レジスタ種類を表す列挙型
@@ -98,7 +106,7 @@ mod registers_tests {
 
     // 読み書き操作テスト
     #[cfg(test)]
-    mod read_write {
+    mod operation {
         use super::*;
         use rstest::rstest;
 
@@ -224,6 +232,31 @@ mod registers_tests {
             //書き込み,読み込み
             let result = registers
                 .write_to(register_type, value)
+                .read_from(register_type);
+
+            // テスト
+            assert_eq!(result, expected);
+        }
+    }
+
+    // 四則演算操作のテスト
+    #[cfg(test)]
+    mod calculation {
+        use super::*;
+        use rstest::*;
+
+        // 加算テスト
+        #[rstest]
+        #[case::add(RegisterType::General{id:30}, 63, 163)]
+        #[case::truncate(RegisterType::General{id:11}, 250, 94)]
+        fn add(#[case] register_type: RegisterType, #[case] value: usize, #[case] expected: usize) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            registers.write_to(register_type, 100);
+
+            // 四則演算操作
+            let result = registers
+                .add_to(register_type, value)
                 .read_from(register_type);
 
             // テスト

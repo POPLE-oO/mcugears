@@ -20,11 +20,14 @@ Microcontroller unit emulator written in Rust
     - プログラムカウンター
     - スタックポインター
     - IOレジスタ(→ 上記に含まれないものはIOレジスタ)
-  - [ ] レジスタ指定の列挙型実装
+  - [x] レジスタ指定の列挙型実装
   - [ ] 操作関数の実装
-    - [ ] read
-    - [ ] write
-    - [ ] 四則演算
+    - [x] read
+    - [x] write
+    - [ ] add
+    - [ ] sub
+    - [ ] div
+    - [ ] mul
     - [ ] bit演算
 - [ ] RAMの実装
   - [ ] RAM構造体の実装
