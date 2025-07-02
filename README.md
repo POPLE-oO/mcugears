@@ -24,7 +24,7 @@ Microcontroller unit emulator written in Rust
   - [ ] 操作関数の実装
     - [x] read
     - [x] write
-    - [ ] add
+    - [x] add
     - [ ] sub
     - [ ] div
     - [ ] mul

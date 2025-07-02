@@ -10,7 +10,20 @@ trait Registers {
     // 加算
     fn add_to(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
         // 加算
-        self.write_to(register_type, self.read_from(register_type) + value);
+        self.write_to(
+            register_type,
+            self.read_from(register_type).wrapping_add(value),
+        );
+
+        self
+    }
+    // 減算
+    fn sub_from(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
+        // 減算
+        self.write_to(
+            register_type,
+            self.read_from(register_type).wrapping_sub(value),
+        );
 
         self
     }
@@ -254,9 +267,27 @@ mod registers_tests {
             let mut registers = ExampleRegisters::new();
             registers.write_to(register_type, 100);
 
-            // 四則演算操作
+            // 操作
             let result = registers
                 .add_to(register_type, value)
+                .read_from(register_type);
+
+            // テスト
+            assert_eq!(result, expected);
+        }
+
+        // 減算テスト
+        #[rstest]
+        #[case::sub(RegisterType::General{id:13}, 12, 88)]
+        #[case::truncate(RegisterType::General{id:7}, 108, 248)]
+        fn sub(#[case] register_type: RegisterType, #[case] value: usize, #[case] expected: usize) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            registers.write_to(register_type, 100);
+
+            // 操作
+            let result = registers
+                .sub_from(register_type, value)
                 .read_from(register_type);
 
             // テスト
