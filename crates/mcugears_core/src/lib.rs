@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // 要素import
 pub mod registers;
 
