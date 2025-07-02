@@ -6,6 +6,8 @@ trait Registers {
     fn write_to<V>(&mut self, register_type: RegisterType, value: V) -> &mut Self
     where
         V: Into<u8> + Into<u16>;
+    // 読み込み
+    fn read_from(&self, register_type: RegisterType) -> usize;
 }
 
 // レジスタ種類を表す列挙型
@@ -23,6 +25,7 @@ mod registers_tests {
     use super::*;
 
     // utility
+    // レジスタ構造体
     #[derive(Clone, Debug, PartialEq)]
     pub struct ExampleRegisters {
         general: [u8; 32],
@@ -32,8 +35,11 @@ mod registers_tests {
         io: [u8; 256],
     }
 
+    // レジスタの実装
     impl Registers for ExampleRegisters {
+        // 初期化
         fn new() -> Self {
+            // 0初期化
             ExampleRegisters {
                 general: [0; 32],
                 status: 0,
@@ -43,19 +49,33 @@ mod registers_tests {
             }
         }
 
+        // レジスタ書き込み
         fn write_to<V>(&mut self, register_type: RegisterType, value: V) -> &mut Self
         where
             V: Into<u8> + Into<u16>,
         {
+            // 書き込み
             match register_type {
-                RegisterType::General { id } => self.general[id] = Into::into(value),
-                RegisterType::Status => self.status = Into::into(value),
-                RegisterType::StackPointer => self.stack_pointer = Into::into(value),
-                RegisterType::ProgramCounter => self.program_counter = Into::into(value),
-                RegisterType::Io { id } => self.io[id] = Into::into(value),
+                RegisterType::General { id } => self.general[id] = value.into(),
+                RegisterType::Status => self.status = value.into(),
+                RegisterType::StackPointer => self.stack_pointer = value.into(),
+                RegisterType::ProgramCounter => self.program_counter = value.into(),
+                RegisterType::Io { id } => self.io[id] = value.into(),
             }
 
             self
+        }
+
+        // レジスタ読み取り
+        fn read_from(&self, register_type: RegisterType) -> usize {
+            // 読み取った値を返す
+            match register_type {
+                RegisterType::General { id } => self.general[id].into(),
+                RegisterType::Status => self.status.into(),
+                RegisterType::StackPointer => self.stack_pointer.into(),
+                RegisterType::ProgramCounter => self.program_counter.into(),
+                RegisterType::Io { id } => self.io[id].into(),
+            }
         }
     }
 
@@ -94,7 +114,7 @@ mod registers_tests {
             let mut registers = ExampleRegisters::new();
             let register_type = RegisterType::General { id: 14 };
 
-            // 操作実行
+            // 書き込み操作実行
             registers.write_to(register_type, 140);
 
             // 想定している結果
@@ -109,6 +129,21 @@ mod registers_tests {
 
             // テスト
             assert_eq!(registers, result);
+        }
+
+        // 読み取り
+        #[test]
+        fn read() {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            let register_type = RegisterType::General { id: 11 };
+            registers.write_to(register_type, 24);
+
+            // 読み込み操作実行
+            let value = registers.read_from(register_type);
+
+            // テスト
+            assert_eq!(value, 24);
         }
     }
 }
