@@ -1,6 +1,6 @@
 // マクロ
 // 演算書き込み実装のマクロ
-macro_rules! impl_register_operation {
+macro_rules! impl_operation {
     ($fn_name:ident, $op:ident) => {
         fn $fn_name(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
             // 演算
@@ -19,13 +19,13 @@ trait Registers {
     fn read_from(&self, register_type: RegisterType) -> usize;
 
     // 加算
-    impl_register_operation!(add_to, wrapping_add);
+    impl_operation!(add_to, wrapping_add);
     // 減算
-    impl_register_operation!(sub_from, wrapping_sub);
+    impl_operation!(sub_from, wrapping_sub);
     // 乗算
-    impl_register_operation!(mul_to, wrapping_mul);
+    impl_operation!(mul_to, wrapping_mul);
     // 徐算
-    impl_register_operation!(div_from, wrapping_div);
+    impl_operation!(div_from, wrapping_div);
 }
 
 // レジスタ種類を表す列挙型
@@ -257,76 +257,55 @@ mod registers_tests {
         use super::*;
         use rstest::*;
 
-        // 加算テスト
-        #[rstest]
-        #[case::add(RegisterType::General{id:30}, 63, 163)]
-        #[case::truncate(RegisterType::General{id:11}, 250, 94)]
-        fn add(#[case] register_type: RegisterType, #[case] value: usize, #[case] expected: usize) {
-            // 初期化
-            let mut registers = ExampleRegisters::new();
-            registers.write_to(register_type, 100);
+        // 演算テスト用マクロ
+        macro_rules! impl_operation_test {
+            ($test_name:ident, $op:ident$(,#[case::$pattern:ident($reg_type:expr,$val:expr,$expected:expr)])+) => {
+                #[rstest]
+                $(
+                    #[case::$pattern($reg_type,$val,$expected)]
+                )+
+                fn $test_name(
+                    #[case] register_type: RegisterType,
+                    #[case] value: usize,
+                    #[case] expected: usize,
+                ) {
+                    // 初期化
+                    let mut registers = ExampleRegisters::new();
+                    registers.write_to(register_type, 100);
 
-            // 操作
-            let result = registers
-                .add_to(register_type, value)
-                .read_from(register_type);
+                    // 操作
+                    let result = registers
+                        .$op(register_type, value)
+                        .read_from(register_type);
 
-            // テスト
-            assert_eq!(result, expected);
+                    // テスト
+                    assert_eq!(result, expected);
+                }
+            };
         }
+
+        // 加算テスト
+        impl_operation_test!(add, add_to,
+            #[case::add(RegisterType::General{id:30}, 63, 163)],
+            #[case::truncate(RegisterType::General{id:11}, 250, 94)]
+        );
 
         // 減算テスト
-        #[rstest]
-        #[case::sub(RegisterType::General{id:13}, 12, 88)]
-        #[case::truncate(RegisterType::General{id:7}, 108, 248)]
-        fn sub(#[case] register_type: RegisterType, #[case] value: usize, #[case] expected: usize) {
-            // 初期化
-            let mut registers = ExampleRegisters::new();
-            registers.write_to(register_type, 100);
-
-            // 操作
-            let result = registers
-                .sub_from(register_type, value)
-                .read_from(register_type);
-
-            // テスト
-            assert_eq!(result, expected);
-        }
+        impl_operation_test!(sub, sub_from,
+            #[case::sub(RegisterType::General{id:13}, 12, 88)],
+            #[case::truncate(RegisterType::General{id:7}, 108, 248)]
+        );
 
         // 乗算テスト
-        #[rstest]
-        #[case::mul(RegisterType::General{id:4}, 2, 200)]
-        #[case::truncate(RegisterType::General{id:24}, 7, 188)]
-        fn mul(#[case] register_type: RegisterType, #[case] value: usize, #[case] expected: usize) {
-            // 初期化
-            let mut registers = ExampleRegisters::new();
-            registers.write_to(register_type, 100);
-
-            // 操作
-            let result = registers
-                .mul_to(register_type, value)
-                .read_from(register_type);
-
-            // テスト
-            assert_eq!(result, expected);
-        }
+        impl_operation_test!(mul, mul_to,
+            #[case::mul(RegisterType::General{id:4}, 2, 200)],
+            #[case::truncate(RegisterType::General{id:24}, 7, 188)]
+        );
 
         // 徐算テスト
-        #[rstest]
-        #[case::div(RegisterType::General{id:8}, 4, 25)]
-        #[case::truncate(RegisterType::General{id:20}, 1000, 0)]
-        fn div(#[case] register_type: RegisterType, #[case] value: usize, #[case] expected: usize) {
-            // 初期化
-            let mut registers = ExampleRegisters::new();
-            registers.write_to(register_type, 100);
-
-            // 操作
-            let result = registers
-                .div_from(register_type, value)
-                .read_from(register_type);
-
-            // テスト
-            assert_eq!(result, expected);
-        }
+        impl_operation_test!(div, div_from,
+            #[case::div(RegisterType::General{id:8}, 4, 25)],
+            #[case::truncate(RegisterType::General{id:20}, 1000, 0)]
+        );
     }
 }
