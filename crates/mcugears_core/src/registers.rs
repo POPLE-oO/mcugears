@@ -1,3 +1,14 @@
+// マクロ
+// 演算書き込み実装のマクロ
+macro_rules! impl_register_operation {
+    ($fn_name:ident, $op:ident) => {
+        fn $fn_name(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
+            // 演算
+            self.write_to(register_type, self.read_from(register_type).$op(value))
+        }
+    };
+}
+
 // レジスタを表す構造体
 trait Registers {
     // 初期化
@@ -8,37 +19,13 @@ trait Registers {
     fn read_from(&self, register_type: RegisterType) -> usize;
 
     // 加算
-    fn add_to(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
-        // 加算
-        self.write_to(
-            register_type,
-            self.read_from(register_type).wrapping_add(value),
-        )
-    }
+    impl_register_operation!(add_to, wrapping_add);
     // 減算
-    fn sub_from(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
-        // 減算
-        self.write_to(
-            register_type,
-            self.read_from(register_type).wrapping_sub(value),
-        )
-    }
+    impl_register_operation!(sub_from, wrapping_sub);
     // 乗算
-    fn mul_to(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
-        // 減算
-        self.write_to(
-            register_type,
-            self.read_from(register_type).wrapping_mul(value),
-        )
-    }
+    impl_register_operation!(mul_to, wrapping_mul);
     // 徐算
-    fn div_from(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
-        // 減算
-        self.write_to(
-            register_type,
-            self.read_from(register_type).wrapping_div(value),
-        )
-    }
+    impl_register_operation!(div_from, wrapping_div);
 }
 
 // レジスタ種類を表す列挙型

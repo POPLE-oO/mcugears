@@ -26,8 +26,8 @@ Microcontroller unit emulator written in Rust
     - [x] write
     - [x] add
     - [x] sub
-    - [ ] div
-    - [ ] mul
+    - [x] div
+    - [x] mul
     - [ ] bit演算
 - [ ] RAMの実装
   - [ ] RAM構造体の実装
