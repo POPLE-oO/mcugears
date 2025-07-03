@@ -25,7 +25,7 @@ Microcontroller unit emulator written in Rust
     - [x] read
     - [x] write
     - [x] add
-    - [ ] sub
+    - [x] sub
     - [ ] div
     - [ ] mul
     - [ ] bit演算

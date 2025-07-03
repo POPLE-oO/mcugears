@@ -13,9 +13,7 @@ trait Registers {
         self.write_to(
             register_type,
             self.read_from(register_type).wrapping_add(value),
-        );
-
-        self
+        )
     }
     // 減算
     fn sub_from(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
@@ -23,9 +21,23 @@ trait Registers {
         self.write_to(
             register_type,
             self.read_from(register_type).wrapping_sub(value),
-        );
-
-        self
+        )
+    }
+    // 乗算
+    fn mul_to(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
+        // 減算
+        self.write_to(
+            register_type,
+            self.read_from(register_type).wrapping_mul(value),
+        )
+    }
+    // 徐算
+    fn div_from(&mut self, register_type: RegisterType, value: usize) -> &mut Self {
+        // 減算
+        self.write_to(
+            register_type,
+            self.read_from(register_type).wrapping_div(value),
+        )
     }
 }
 
@@ -288,6 +300,42 @@ mod registers_tests {
             // 操作
             let result = registers
                 .sub_from(register_type, value)
+                .read_from(register_type);
+
+            // テスト
+            assert_eq!(result, expected);
+        }
+
+        // 乗算テスト
+        #[rstest]
+        #[case::mul(RegisterType::General{id:4}, 2, 200)]
+        #[case::truncate(RegisterType::General{id:24}, 7, 188)]
+        fn mul(#[case] register_type: RegisterType, #[case] value: usize, #[case] expected: usize) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            registers.write_to(register_type, 100);
+
+            // 操作
+            let result = registers
+                .mul_to(register_type, value)
+                .read_from(register_type);
+
+            // テスト
+            assert_eq!(result, expected);
+        }
+
+        // 徐算テスト
+        #[rstest]
+        #[case::div(RegisterType::General{id:8}, 4, 25)]
+        #[case::truncate(RegisterType::General{id:20}, 1000, 0)]
+        fn div(#[case] register_type: RegisterType, #[case] value: usize, #[case] expected: usize) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            registers.write_to(register_type, 100);
+
+            // 操作
+            let result = registers
+                .div_from(register_type, value)
                 .read_from(register_type);
 
             // テスト
