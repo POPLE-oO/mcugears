@@ -29,21 +29,30 @@ Microcontroller unit emulator written in Rust
     - [x] div
     - [x] mul
     - [ ] bit演算
-- [ ] RAMの実装
+  - [ ] レジスタ更新関数の実装
+    - [ ] update_pc     // プログラムカウンター
+    - [ ] update_timer  // タイマー
+    - [ ] update        // 更新の実行
+
+- [x] RAMの実装
   - [x] RAM構造体の実装
-  - [ ] 操作関数の実装
-    - [ ] read
-    - [ ] write
+  - [x] 操作関数の実装
+    - [x] read
+    - [x] write
+
 - [ ] 命令の実装
-  - [ ] ADD
-  - [ ] JMP
-  - [ ] PUSH
-  - [ ] POP
-  - [ ] NOP
-  - [ ] MOV
-  - [ ] CMP
-  - [ ] LD
-  - [ ] ST
+  - [ ] 命令関数の実装
+    - [x] ADD
+    - [ ] JMP
+    - [ ] PUSH
+    - [ ] POP
+    - [ ] NOP
+    - [ ] MOV
+    - [ ] CMP
+    - [ ] LD
+    - [ ] ST
+  - [ ] 副作用持つかの判定関数
+
 - [ ] マイコン構造体の実装
   - [ ] マイコン構造体の実装
   - [ ] 操作関数の実装(→イテレータ?)

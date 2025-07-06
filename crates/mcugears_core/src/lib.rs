@@ -1,5 +1,6 @@
-#![allow(dead_code)]
+#[allow(clippy::nonminimal_bool)]
 // 要素import
+pub mod instructions;
 pub mod registers;
 pub mod user_ram;
 

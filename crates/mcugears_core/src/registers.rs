@@ -1,3 +1,36 @@
+// ビット操作
+pub trait BitOperation {
+    fn get_bit(&self, id: usize) -> bool;
+    fn generate_from_bit(&self, flags: &[Option<bool>]) -> usize;
+}
+impl BitOperation for usize {
+    // 右からid番目(0スタート)のbit取得
+    fn get_bit(&self, id: usize) -> bool {
+        (*self & (1 << id)) != 0
+    }
+
+    // boolのOptionからSome(1)なら1,Some(0)なら0,Noneなら元の値のままでbit操作
+    fn generate_from_bit(&self, flags: &[Option<bool>]) -> usize {
+        let mut result = *self;
+        // flagsの若いidのほうからbitの左側
+        for (id, flag) in flags.iter().rev().enumerate() {
+            // 変更するなら
+            if let Some(bit) = flag {
+                if *bit {
+                    // trueなら1
+                    result |= 1 << id;
+                } else {
+                    // falseなら0
+                    result &= !(1 << id);
+                }
+            }
+            // 変更しない場合は操作しない
+        }
+
+        result
+    }
+}
+
 // マクロ
 // 演算書き込み実装のマクロ
 macro_rules! impl_operation {
@@ -10,7 +43,7 @@ macro_rules! impl_operation {
 }
 
 // レジスタを表す構造体
-trait Registers {
+pub trait Registers {
     // 初期化
     fn new() -> Self;
     // 書き込み
@@ -38,9 +71,38 @@ pub enum RegisterType {
     Io { id: usize },
 }
 
+// プログラムカウンター更新
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PCUpdate {
+    Default,
+    Relative(isize),
+    Absolute(usize),
+}
+
+// 実行後レジスタ更新
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RegisterUpdate {
+    cycles: usize,
+    pc_update: PCUpdate,
+}
+
+impl RegisterUpdate {
+    // 初期化
+    pub fn new(cycles: usize, pc_update: PCUpdate) -> Self {
+        RegisterUpdate { cycles, pc_update }
+    }
+
+    // register updateを用いたレジスタ更新
+    // fn update<R: Registers>(&self, registers: &mut R) {
+    //     registers.update_timer(self.cycles);
+    //     registers.update_pc(self.pc_update);
+    // }
+}
+
 #[cfg(test)]
-mod register_tests {
+pub mod register_tests {
     use super::*;
+    use rstest::rstest;
 
     // utility
     // レジスタ構造体
@@ -255,7 +317,6 @@ mod register_tests {
     #[cfg(test)]
     mod calculation {
         use super::*;
-        use rstest::*;
 
         // 演算テスト用マクロ
         macro_rules! impl_operation_test {
@@ -286,26 +347,51 @@ mod register_tests {
 
         // 加算テスト
         impl_operation_test!(add, add_to,
-            #[case::add(RegisterType::General{id:30}, 63, 163)],
+            #[case::default(RegisterType::General{id:30}, 63, 163)],
             #[case::truncate(RegisterType::General{id:11}, 250, 94)]
         );
 
         // 減算テスト
         impl_operation_test!(sub, sub_from,
-            #[case::sub(RegisterType::General{id:13}, 12, 88)],
+            #[case::default(RegisterType::General{id:13}, 12, 88)],
             #[case::truncate(RegisterType::General{id:7}, 108, 248)]
         );
 
         // 乗算テスト
         impl_operation_test!(mul, mul_to,
-            #[case::mul(RegisterType::General{id:4}, 2, 200)],
+            #[case::default(RegisterType::General{id:4}, 2, 200)],
             #[case::truncate(RegisterType::General{id:24}, 7, 188)]
         );
 
         // 徐算テスト
         impl_operation_test!(div, div_from,
-            #[case::div(RegisterType::General{id:8}, 4, 25)],
+            #[case::default(RegisterType::General{id:8}, 4, 25)],
             #[case::truncate(RegisterType::General{id:20}, 1000, 0)]
         );
+    }
+
+    // ビット操作のテスト
+    #[cfg(test)]
+    mod bit_operation {
+        use super::*;
+
+        // ビット取得
+        #[rstest]
+        #[case::get_1(0b0000_1000, 3, true)]
+        #[case::get_0(0b0000_0010, 5, false)]
+        fn get_bit(#[case] value: usize, #[case] id: usize, #[case] expected: bool) {
+            assert_eq!(value.get_bit(id), expected);
+        }
+
+        // boolから生成
+        #[test]
+        fn generate_from_bit() {
+            // 初期化
+            let flags = vec![Some(false), Some(true), None, None];
+            let status: usize = 0b0010;
+
+            // テスト
+            assert_eq!(status.generate_from_bit(&flags), 0b0110)
+        }
     }
 }

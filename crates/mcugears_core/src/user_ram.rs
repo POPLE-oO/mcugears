@@ -19,13 +19,13 @@ pub struct RamAddress(usize);
 
 //  テスト
 #[cfg(test)]
-mod user_ram_tests {
+pub mod user_ram_tests {
     use super::*;
 
     // utility
     // RAM構造体
     #[derive(Clone, PartialEq, Debug)]
-    struct ExampleUserRam(Vec<u8>);
+    pub struct ExampleUserRam(Vec<u8>);
 
     impl UserRam for ExampleUserRam {
         // UserRamのスタートアドレス
@@ -69,7 +69,7 @@ mod user_ram_tests {
         use rstest::rstest;
 
         // 読み込み
-        #[rstest]
+        #[test]
         fn read() {
             // 初期化
             let mut user_ram = ExampleUserRam::new();
@@ -83,7 +83,7 @@ mod user_ram_tests {
 
         // 書き込み
         #[rstest]
-        #[case::write(0x1F3, 110, 110)]
+        #[case::default(0x1F3, 110, 110)]
         #[case::truncate(0x300, 420, 164)]
         fn write(#[case] address: usize, #[case] value: usize, #[case] expected: usize) {
             // 初期化
