@@ -1,3 +1,8 @@
+#![allow(dead_code)]
+// 要素import
+pub mod registers;
+pub mod user_ram;
+
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }
