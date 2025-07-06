@@ -59,6 +59,18 @@ pub trait Registers {
     impl_operation!(mul_to, wrapping_mul);
     // 徐算
     impl_operation!(div_from, wrapping_div);
+
+    // program_counter 読み込み
+    fn read_pc(&self) -> usize {
+        self.read_from(RegisterType::ProgramCounter)
+    }
+    // stack_pointer 読み込み
+    fn read_sp(&self) -> usize {
+        self.read_from(RegisterType::StackPointer)
+    }
+
+    // program counter 更新
+    fn update_pc(&mut self, pc_update: PCUpdate);
 }
 
 // レジスタ種類を表す列挙型
@@ -92,11 +104,11 @@ impl RegisterUpdate {
         RegisterUpdate { cycles, pc_update }
     }
 
-    // register updateを用いたレジスタ更新
-    // fn update<R: Registers>(&self, registers: &mut R) {
-    //     registers.update_timer(self.cycles);
-    //     registers.update_pc(self.pc_update);
-    // }
+    // RegisterUpdateを用いたレジスタ更新
+    pub fn update<R: Registers>(&self, registers: &mut R) {
+        //     registers.update_timer(self.cycles);
+        registers.update_pc(self.pc_update);
+    }
 }
 
 #[cfg(test)]
@@ -153,6 +165,44 @@ pub mod register_tests {
                 RegisterType::ProgramCounter => self.program_counter.into(),
                 RegisterType::Io { id } => self.io[id].into(),
             }
+        }
+
+        fn update_pc(&mut self, pc_update: PCUpdate) {
+            match pc_update {
+                PCUpdate::Default => self.add_to(RegisterType::ProgramCounter, 1),
+
+                PCUpdate::Relative(value) => self.write_to(
+                    RegisterType::ProgramCounter,
+                    self.read_from(RegisterType::ProgramCounter)
+                        .wrapping_add_signed(value),
+                ),
+                PCUpdate::Absolute(value) => self.write_to(RegisterType::ProgramCounter, value),
+            };
+        }
+    }
+
+    // ビット操作のテスト
+    #[cfg(test)]
+    mod bit_operation {
+        use super::*;
+
+        // ビット取得
+        #[rstest]
+        #[case::get_1(0b0000_1000, 3, true)]
+        #[case::get_0(0b0000_0010, 5, false)]
+        fn get_bit(#[case] value: usize, #[case] id: usize, #[case] expected: bool) {
+            assert_eq!(value.get_bit(id), expected);
+        }
+
+        // boolから生成
+        #[test]
+        fn generate_from_bit() {
+            // 初期化
+            let flags = vec![Some(false), Some(true), None, None];
+            let status: usize = 0b0010;
+
+            // テスト
+            assert_eq!(status.generate_from_bit(&flags), 0b0110)
         }
     }
 
@@ -370,28 +420,69 @@ pub mod register_tests {
         );
     }
 
-    // ビット操作のテスト
+    // read_fromのショートハンド
     #[cfg(test)]
-    mod bit_operation {
+    mod read_shorthand {
         use super::*;
 
-        // ビット取得
-        #[rstest]
-        #[case::get_1(0b0000_1000, 3, true)]
-        #[case::get_0(0b0000_0010, 5, false)]
-        fn get_bit(#[case] value: usize, #[case] id: usize, #[case] expected: bool) {
-            assert_eq!(value.get_bit(id), expected);
+        // pcの取得
+        #[test]
+        fn read_pc() {
+            let mut registers = ExampleRegisters::new();
+            registers.write_to(RegisterType::ProgramCounter, 1552);
+
+            assert_eq!(registers.read_pc(), 1552);
         }
 
-        // boolから生成
+        // spの取得
         #[test]
-        fn generate_from_bit() {
+        fn read_sp() {
+            let mut registers = ExampleRegisters::new();
+            registers.write_to(RegisterType::StackPointer, 0x3FF);
+
+            assert_eq!(registers.read_sp(), 0x3FF);
+        }
+    }
+
+    // レジスタ更新のテスト
+    #[cfg(test)]
+    mod updates {
+
+        use super::*;
+
+        // pcの更新テスト
+        #[rstest]
+        #[case::default(PCUpdate::Default, 31)]
+        #[case::relative(PCUpdate::Relative(14), 44)]
+        #[case::relative_negative(PCUpdate::Relative(-13), 17)]
+        #[case::absolute(PCUpdate::Absolute(52), 52)]
+        #[case::relative_trancate(PCUpdate::Relative(68548), 3042)]
+        #[case::relative_trancate_negative(PCUpdate::Relative(-58), 65508)]
+        #[case::absolute_trancate(PCUpdate::Absolute(65545), 9)]
+        fn update_pc(#[case] pc_update: PCUpdate, #[case] expected: usize) {
             // 初期化
-            let flags = vec![Some(false), Some(true), None, None];
-            let status: usize = 0b0010;
+            let mut registers = ExampleRegisters::new();
+            registers.write_to(RegisterType::ProgramCounter, 30);
+
+            // pc更新
+            registers.update_pc(pc_update);
 
             // テスト
-            assert_eq!(status.generate_from_bit(&flags), 0b0110)
+            assert_eq!(registers.read_pc(), expected);
+        }
+
+        #[test]
+        fn update() {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            registers.write_to(RegisterType::ProgramCounter, 105);
+            let register_update = RegisterUpdate::new(1, PCUpdate::Default);
+
+            // 更新実行
+            register_update.update(&mut registers);
+
+            // テスト
+            assert_eq!(registers.read_pc(), 106);
         }
     }
 }

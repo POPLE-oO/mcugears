@@ -30,9 +30,9 @@ Microcontroller unit emulator written in Rust
     - [x] mul
     - [ ] bit演算
   - [ ] レジスタ更新関数の実装
-    - [ ] update_pc     // プログラムカウンター
+    - [x] update_pc     // プログラムカウンター
     - [ ] update_timer  // タイマー
-    - [ ] update        // 更新の実行
+    - [x] update        // 更新の実行
 
 - [x] RAMの実装
   - [x] RAM構造体の実装
