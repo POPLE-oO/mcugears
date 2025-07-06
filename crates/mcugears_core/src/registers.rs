@@ -39,7 +39,7 @@ pub enum RegisterType {
 }
 
 #[cfg(test)]
-mod registers_tests {
+mod register_tests {
     use super::*;
 
     // utility

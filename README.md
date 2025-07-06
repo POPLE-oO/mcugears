@@ -30,8 +30,7 @@ Microcontroller unit emulator written in Rust
     - [x] mul
     - [ ] bit演算
 - [ ] RAMの実装
-  - [ ] RAM構造体の実装
-    - [ ] RAM空間の実装
+  - [x] RAM構造体の実装
   - [ ] 操作関数の実装
     - [ ] read
     - [ ] write
