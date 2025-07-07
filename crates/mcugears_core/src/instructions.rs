@@ -120,8 +120,6 @@ pub mod instructions_tests {
     // 命令の実行テスト
     #[cfg(test)]
     mod run {
-        use crate::instructions;
-
         use super::*;
 
         // addの実行
@@ -183,6 +181,7 @@ pub mod instructions_tests {
             let result = instruction.run(&mut registers, &mut user_ram);
 
             assert_eq!(result, RegisterUpdate::new(3, PCUpdate::Absolute(k)));
+            assert_eq!(registers.read_from(RegisterType::StackPointer), status);
         }
     }
 }

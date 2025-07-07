@@ -2,6 +2,7 @@
 pub trait BitOperation {
     fn get_bit(&self, id: usize) -> bool;
     fn generate_from_bit(&self, flags: &[Option<bool>]) -> usize;
+    fn generate_as_complement(&self, size: usize) -> isize;
 }
 impl BitOperation for usize {
     // 右からid番目(0スタート)のbit取得
@@ -28,6 +29,15 @@ impl BitOperation for usize {
         }
 
         result
+    }
+
+    // size bitのselfを補数表現として解釈してisizeに変換
+    fn generate_as_complement(&self, size: usize) -> isize {
+        if self.get_bit(size - 1) {
+            -((*self ^ ((1 << size) - 1)) as isize)
+        } else {
+            *self as isize
+        }
     }
 }
 
@@ -203,6 +213,18 @@ pub mod register_tests {
 
             // テスト
             assert_eq!(status.generate_from_bit(&flags), 0b0110)
+        }
+
+        // size bitのusizeを補数表現として解釈する
+        #[rstest]
+        #[case::positive(0b010110, 6, 22)]
+        #[case::negative(0b11100,5,-3)]
+        fn generate_as_complement(
+            #[case] value: usize,
+            #[case] size: usize,
+            #[case] expected: isize,
+        ) {
+            assert_eq!(value.generate_as_complement(size), expected);
         }
     }
 
