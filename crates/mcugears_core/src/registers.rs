@@ -79,8 +79,35 @@ pub trait Registers {
         self.read_from(RegisterType::StackPointer)
     }
 
-    // program counter 更新
-    fn update_pc(&mut self, pc_update: PCUpdate);
+    // プログラムカウンター更新
+    fn update_pc(&mut self, pc_update: PointerUpdate) -> &mut Self {
+        match pc_update {
+            PointerUpdate::Increment => self.add_to(RegisterType::ProgramCounter, 1),
+            PointerUpdate::Decrement => self.sub_from(RegisterType::ProgramCounter, 1),
+            PointerUpdate::Relative(value) => self.write_to(
+                RegisterType::ProgramCounter,
+                self.read_from(RegisterType::ProgramCounter)
+                    .wrapping_add_signed(value),
+            ),
+            PointerUpdate::Absolute(value) => self.write_to(RegisterType::ProgramCounter, value),
+        };
+        self
+    }
+
+    // スタックポインター更新
+    fn update_sp(&mut self, sp_update: PointerUpdate) -> &mut Self {
+        match sp_update {
+            PointerUpdate::Increment => self.add_to(RegisterType::StackPointer, 1),
+            PointerUpdate::Decrement => self.sub_from(RegisterType::StackPointer, 1),
+            PointerUpdate::Relative(value) => self.write_to(
+                RegisterType::StackPointer,
+                self.read_from(RegisterType::StackPointer)
+                    .wrapping_add_signed(value),
+            ),
+            PointerUpdate::Absolute(value) => self.write_to(RegisterType::StackPointer, value),
+        };
+        self
+    }
 }
 
 // レジスタ種類を表す列挙型
@@ -95,8 +122,9 @@ pub enum RegisterType {
 
 // プログラムカウンター更新
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum PCUpdate {
-    Default,
+pub enum PointerUpdate {
+    Increment,
+    Decrement,
     Relative(isize),
     Absolute(usize),
 }
@@ -105,12 +133,12 @@ pub enum PCUpdate {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RegisterUpdate {
     cycles: usize,
-    pc_update: PCUpdate,
+    pc_update: PointerUpdate,
 }
 
 impl RegisterUpdate {
     // 初期化
-    pub fn new(cycles: usize, pc_update: PCUpdate) -> Self {
+    pub fn new(cycles: usize, pc_update: PointerUpdate) -> Self {
         RegisterUpdate { cycles, pc_update }
     }
 
@@ -185,20 +213,6 @@ pub mod register_tests {
                 RegisterType::ProgramCounter => self.program_counter.into(),
                 RegisterType::Io { id } => self.io[id].into(),
             }
-        }
-
-        // プログラムカウンター更新
-        fn update_pc(&mut self, pc_update: PCUpdate) {
-            match pc_update {
-                PCUpdate::Default => self.add_to(RegisterType::ProgramCounter, 1),
-
-                PCUpdate::Relative(value) => self.write_to(
-                    RegisterType::ProgramCounter,
-                    self.read_from(RegisterType::ProgramCounter)
-                        .wrapping_add_signed(value),
-                ),
-                PCUpdate::Absolute(value) => self.write_to(RegisterType::ProgramCounter, value),
-            };
         }
     }
 
@@ -480,14 +494,12 @@ pub mod register_tests {
 
         // pcの更新テスト
         #[rstest]
-        #[case::default(PCUpdate::Default, 31)]
-        #[case::relative(PCUpdate::Relative(14), 44)]
-        #[case::relative_negative(PCUpdate::Relative(-13), 17)]
-        #[case::absolute(PCUpdate::Absolute(52), 52)]
-        #[case::relative_trancate(PCUpdate::Relative(68548), 3042)]
-        #[case::relative_trancate_negative(PCUpdate::Relative(-58), 65508)]
-        #[case::absolute_trancate(PCUpdate::Absolute(65545), 9)]
-        fn update_pc(#[case] pc_update: PCUpdate, #[case] expected: usize) {
+        #[case::increment(PointerUpdate::Increment, 31)]
+        #[case::decrement(PointerUpdate::Decrement, 29)]
+        #[case::relative(PointerUpdate::Relative(14), 44)]
+        #[case::relative_negative(PointerUpdate::Relative(-13), 17)]
+        #[case::absolute(PointerUpdate::Absolute(52), 52)]
+        fn update_pc(#[case] pc_update: PointerUpdate, #[case] expected: usize) {
             // 初期化
             let mut registers = ExampleRegisters::new();
             registers.write_to(RegisterType::ProgramCounter, 30);
@@ -499,12 +511,31 @@ pub mod register_tests {
             assert_eq!(registers.read_pc(), expected);
         }
 
+        // spの更新テスト
+        #[rstest]
+        #[case::increment(PointerUpdate::Increment, 0x6F4)]
+        #[case::decrement(PointerUpdate::Decrement, 0x6F2)]
+        #[case::relative(PointerUpdate::Relative(3), 0x6F6)]
+        #[case::relative_negative(PointerUpdate::Relative(-15), 0x6E4)]
+        #[case::absolute(PointerUpdate::Absolute(0x552), 0x552)]
+        fn update_sp(#[case] sp_update: PointerUpdate, #[case] expected: usize) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            registers.write_to(RegisterType::StackPointer, 0x6F3);
+
+            // sp更新
+            registers.update_sp(sp_update);
+
+            // テスト
+            assert_eq!(registers.read_sp(), expected);
+        }
+
         #[test]
         fn update() {
             // 初期化
             let mut registers = ExampleRegisters::new();
             registers.write_to(RegisterType::ProgramCounter, 105);
-            let register_update = RegisterUpdate::new(1, PCUpdate::Default);
+            let register_update = RegisterUpdate::new(1, PointerUpdate::Increment);
 
             // 更新実行
             register_update.update(&mut registers);

@@ -22,6 +22,7 @@ pub mod instructions_tests {
         Add { id_rd: usize, id_rr: usize },
         Jmp { val_k: usize },
         Push { id_rr: usize },
+        Pop { id_rd: usize },
     }
 
     impl ExampleInstruction {
@@ -93,13 +94,13 @@ pub mod instructions_tests {
                     .generate_from_bit(&flags),
             );
 
-            RegisterUpdate::new(1, PCUpdate::Default)
+            RegisterUpdate::new(1, PointerUpdate::Increment)
         }
 
         // JMP
         fn jmp(val_k: usize) -> RegisterUpdate {
             // レジスタ更新を返す
-            RegisterUpdate::new(3, PCUpdate::Absolute(val_k))
+            RegisterUpdate::new(3, PointerUpdate::Absolute(val_k))
         }
 
         // PUSH
@@ -113,10 +114,27 @@ pub mod instructions_tests {
 
             // push
             user_ram.write_to(RamAddress(registers.read_sp()), rr);
-            registers.sub_from(RegisterType::StackPointer, 1);
+            // stack pointer更新
+            registers.update_sp(PointerUpdate::Decrement);
 
             // update
-            RegisterUpdate::new(2, PCUpdate::Default)
+            RegisterUpdate::new(2, PointerUpdate::Increment)
+        }
+
+        fn pop<R: Registers, U: UserRam>(
+            registers: &mut R,
+            user_ram: &mut U,
+            id_rd: usize,
+        ) -> RegisterUpdate {
+            // pop
+            // スタックポインタ更新
+            registers.update_sp(PointerUpdate::Increment);
+            // 値取得
+            let value = user_ram.read_from(RamAddress(registers.read_sp()));
+            // レジスタに代入
+            registers.write_to(RegisterType::General { id: id_rd }, value);
+
+            RegisterUpdate::new(2, PointerUpdate::Increment)
         }
     }
 
@@ -133,6 +151,7 @@ pub mod instructions_tests {
                 Add { id_rd, id_rr } => Self::add(registers, *id_rd, *id_rr),
                 Jmp { val_k } => Self::jmp(*val_k),
                 Push { id_rr } => Self::push(registers, user_ram, *id_rr),
+                Pop { id_rd } => Self::pop(registers, user_ram, *id_rd),
             }
         }
     }
@@ -184,7 +203,7 @@ pub mod instructions_tests {
             // 実行結果
             assert_eq!(
                 result,
-                RegisterUpdate::new(1, PCUpdate::Default),
+                RegisterUpdate::new(1, PointerUpdate::Increment),
                 "register update is wrong"
             );
         }
@@ -204,7 +223,7 @@ pub mod instructions_tests {
 
             assert_eq!(
                 result,
-                RegisterUpdate::new(3, PCUpdate::Absolute(k)),
+                RegisterUpdate::new(3, PointerUpdate::Absolute(k)),
                 "update is wrong"
             );
             assert_eq!(
@@ -215,13 +234,13 @@ pub mod instructions_tests {
         }
 
         // pushのテスト
-        #[rstest]
+        #[test]
         fn push() {
             // 初期化
             let mut registers = ExampleRegisters::new();
             let mut user_ram = ExampleUserRam::new();
             registers
-                .write_to(RegisterType::StackPointer, 0x7F3)
+                .update_sp(PointerUpdate::Absolute(0x7F3))
                 .write_to(RegisterType::General { id: 7 }, 127);
 
             // 実行
@@ -231,11 +250,31 @@ pub mod instructions_tests {
             // テスト
             assert_eq!(
                 result,
-                RegisterUpdate::new(2, PCUpdate::Default),
+                RegisterUpdate::new(2, PointerUpdate::Increment),
                 "update is wrong"
             );
             assert_eq!(user_ram.read_from(RamAddress(0x7F3)), 127);
             assert_eq!(registers.read_sp(), 0x7F2);
+            assert_eq!(registers.read_from(RegisterType::Status), 0b0000_0000);
+        }
+
+        // popのテスト
+        #[test]
+        fn pop() {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            let mut user_ram = ExampleUserRam::new();
+            registers.update_sp(PointerUpdate::Absolute(0x5F6));
+            user_ram.write_to(RamAddress(0x5F7), 57);
+
+            // pop実行
+            let instruction = ExampleInstruction::Pop { id_rd: 12 };
+            let result = instruction.run(&mut registers, &mut user_ram);
+
+            // テスト
+            assert_eq!(result, RegisterUpdate::new(2, PointerUpdate::Increment));
+            assert_eq!(registers.read_from(RegisterType::General { id: 12 }), 57);
+            assert_eq!(registers.read_sp(), 0x5F7);
             assert_eq!(registers.read_from(RegisterType::Status), 0b0000_0000);
         }
     }
