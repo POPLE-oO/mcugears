@@ -123,6 +123,8 @@ impl RegisterUpdate {
 
 #[cfg(test)]
 pub mod register_tests {
+    use crate::user_ram::{UserRam, user_ram_tests::ExampleUserRam};
+
     use super::*;
     use rstest::rstest;
 
@@ -142,13 +144,21 @@ pub mod register_tests {
         // 初期化
         fn new() -> Self {
             // 0初期化
-            ExampleRegisters {
+            let mut registers = ExampleRegisters {
                 general: [0; 32],
                 status: 0,
                 stack_pointer: 0,
                 program_counter: 0,
                 io: [0; 256],
-            }
+            };
+
+            // スタックポインター更新
+            registers.write_to(
+                RegisterType::StackPointer,
+                ExampleUserRam::get_end_address(),
+            );
+
+            registers
         }
 
         // レジスタ書き込み
@@ -177,6 +187,7 @@ pub mod register_tests {
             }
         }
 
+        // プログラムカウンター更新
         fn update_pc(&mut self, pc_update: PCUpdate) {
             match pc_update {
                 PCUpdate::Default => self.add_to(RegisterType::ProgramCounter, 1),
@@ -235,18 +246,19 @@ pub mod register_tests {
 
         #[test]
         fn initialize() {
-            let registers = ExampleRegisters::new();
+            // 期待しているもの
+            let mut expected = ExampleRegisters {
+                general: [0; 32],
+                status: 0,
+                stack_pointer: 0,
+                program_counter: 0,
+                io: [0; 256],
+            };
+            expected.stack_pointer = 0x8FF;
 
-            assert_eq!(
-                registers,
-                ExampleRegisters {
-                    general: [0; 32],
-                    status: 0,
-                    stack_pointer: 0,
-                    program_counter: 0,
-                    io: [0; 256],
-                }
-            )
+            //テスト
+            let registers = ExampleRegisters::new();
+            assert_eq!(registers, expected)
         }
     }
 
@@ -267,13 +279,7 @@ pub mod register_tests {
             registers.write_to(register_type, 140);
 
             // 想定している結果
-            let mut expected = ExampleRegisters {
-                general: [0; 32],
-                status: 0,
-                stack_pointer: 0,
-                program_counter: 0,
-                io: [0; 256],
-            };
+            let mut expected = ExampleRegisters::new();
             expected.general[14] = 140;
 
             // テスト

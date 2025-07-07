@@ -44,7 +44,7 @@ Microcontroller unit emulator written in Rust
   - [ ] 命令関数の実装
     - [x] ADD
     - [x] JMP
-    - [ ] PUSH
+    - [x] PUSH
     - [ ] POP
     - [ ] NOP
     - [ ] MOV

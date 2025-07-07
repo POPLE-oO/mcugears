@@ -5,7 +5,7 @@ use crate::{
 
 // 命令のメソッド
 pub trait Instruction {
-    fn run<R: Registers, D: UserRam>(&self, registers: &mut R, user_ram: &mut D) -> RegisterUpdate;
+    fn run<R: Registers, U: UserRam>(&self, registers: &mut R, user_ram: &mut U) -> RegisterUpdate;
 }
 
 #[cfg(test)]
@@ -13,7 +13,7 @@ pub mod instructions_tests {
     use super::*;
     use crate::registers::register_tests::*;
     use crate::registers::*;
-    use crate::user_ram::user_ram_tests::*;
+    use crate::user_ram::{RamAddress, user_ram_tests::*};
     use rstest::rstest;
 
     // 命令の種類
@@ -21,6 +21,7 @@ pub mod instructions_tests {
     pub enum ExampleInstruction {
         Add { id_rd: usize, id_rr: usize },
         Jmp { val_k: usize },
+        Push { id_rr: usize },
     }
 
     impl ExampleInstruction {
@@ -97,15 +98,33 @@ pub mod instructions_tests {
 
         // JMP
         fn jmp(val_k: usize) -> RegisterUpdate {
+            // レジスタ更新を返す
             RegisterUpdate::new(3, PCUpdate::Absolute(val_k))
+        }
+
+        // PUSH
+        fn push<R: Registers, U: UserRam>(
+            registers: &mut R,
+            user_ram: &mut U,
+            id_rr: usize,
+        ) -> RegisterUpdate {
+            // 値を取得
+            let rr = registers.read_from(RegisterType::General { id: id_rr });
+
+            // push
+            user_ram.write_to(RamAddress(registers.read_sp()), rr);
+            registers.sub_from(RegisterType::StackPointer, 1);
+
+            // update
+            RegisterUpdate::new(2, PCUpdate::Default)
         }
     }
 
     impl Instruction for ExampleInstruction {
-        fn run<R: Registers, D: UserRam>(
+        fn run<R: Registers, U: UserRam>(
             &self,
             registers: &mut R,
-            user_ram: &mut D,
+            user_ram: &mut U,
         ) -> RegisterUpdate {
             // 命令の実行
             use ExampleInstruction::*;
@@ -113,6 +132,7 @@ pub mod instructions_tests {
             match self {
                 Add { id_rd, id_rr } => Self::add(registers, *id_rd, *id_rr),
                 Jmp { val_k } => Self::jmp(*val_k),
+                Push { id_rr } => Self::push(registers, user_ram, *id_rr),
             }
         }
     }
@@ -120,18 +140,19 @@ pub mod instructions_tests {
     // 命令の実行テスト
     #[cfg(test)]
     mod run {
+        use crate::user_ram::RamAddress;
+
         use super::*;
 
         // addの実行
         #[rstest]
-        #[case::default([12,100], [5,31], 131, 0b00101100, 1,PCUpdate::Default)]
+        #[case::default([12,100], [5,31], 131, 0b00101100)]
+        #[case::truncate([3,202], [25,123], 69, 0b00100001)]
         fn add(
             #[case] rd: [usize; 2],
             #[case] rr: [usize; 2],
             #[case] expected: usize,
             #[case] status: usize,
-            #[case] cycles: usize,
-            #[case] pc_update: PCUpdate,
         ) {
             //  初期化
             let mut registers = ExampleRegisters::new();
@@ -163,11 +184,12 @@ pub mod instructions_tests {
             // 実行結果
             assert_eq!(
                 result,
-                RegisterUpdate::new(cycles, pc_update),
+                RegisterUpdate::new(1, PCUpdate::Default),
                 "register update is wrong"
             );
         }
 
+        // jmpの実行
         #[rstest]
         #[case::defalut(1001, 0b0000_0000)]
         fn jmp(#[case] k: usize, #[case] status: usize) {
@@ -180,8 +202,41 @@ pub mod instructions_tests {
             let instruction = ExampleInstruction::Jmp { val_k: k };
             let result = instruction.run(&mut registers, &mut user_ram);
 
-            assert_eq!(result, RegisterUpdate::new(3, PCUpdate::Absolute(k)));
-            assert_eq!(registers.read_from(RegisterType::StackPointer), status);
+            assert_eq!(
+                result,
+                RegisterUpdate::new(3, PCUpdate::Absolute(k)),
+                "update is wrong"
+            );
+            assert_eq!(
+                registers.read_from(RegisterType::Status),
+                status,
+                "status is wrong"
+            );
+        }
+
+        // pushのテスト
+        #[rstest]
+        fn push() {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            let mut user_ram = ExampleUserRam::new();
+            registers
+                .write_to(RegisterType::StackPointer, 0x7F3)
+                .write_to(RegisterType::General { id: 7 }, 127);
+
+            // 実行
+            let instruction = ExampleInstruction::Push { id_rr: 7 };
+            let result = instruction.run(&mut registers, &mut user_ram);
+
+            // テスト
+            assert_eq!(
+                result,
+                RegisterUpdate::new(2, PCUpdate::Default),
+                "update is wrong"
+            );
+            assert_eq!(user_ram.read_from(RamAddress(0x7F3)), 127);
+            assert_eq!(registers.read_sp(), 0x7F2);
+            assert_eq!(registers.read_from(RegisterType::Status), 0b0000_0000);
         }
     }
 }

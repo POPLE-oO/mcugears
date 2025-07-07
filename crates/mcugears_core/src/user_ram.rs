@@ -12,10 +12,19 @@ pub trait UserRam {
     fn write_to(&mut self, address: RamAddress, value: usize) -> &mut Self;
     //読み込み
     fn read_from(&mut self, address: RamAddress) -> usize;
+
+    // startアドレス取得
+    fn get_start_address() -> usize {
+        Self::START_ADDRESS
+    }
+    // endアドレス取得
+    fn get_end_address() -> usize {
+        Self::END_ADDRESS
+    }
 }
 // Ramのアドレス
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct RamAddress(usize);
+pub struct RamAddress(pub usize);
 
 //  テスト
 #[cfg(test)]
