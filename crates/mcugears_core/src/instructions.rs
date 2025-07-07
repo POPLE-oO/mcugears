@@ -20,9 +20,11 @@ pub mod instructions_tests {
     #[derive(Clone, Copy, Debug)]
     pub enum ExampleInstruction {
         Add { id_rd: usize, id_rr: usize },
+        Jmp { val_k: usize },
     }
 
     impl ExampleInstruction {
+        // ADD
         fn add<R: Registers>(registers: &mut R, id_rd: usize, id_rr: usize) -> RegisterUpdate {
             // 加算
             let rr = registers.read_from(RegisterType::General { id: id_rr });
@@ -92,6 +94,11 @@ pub mod instructions_tests {
 
             RegisterUpdate::new(1, PCUpdate::Default)
         }
+
+        // JMP
+        fn jmp(val_k: usize) -> RegisterUpdate {
+            RegisterUpdate::new(3, PCUpdate::Absolute(val_k))
+        }
     }
 
     impl Instruction for ExampleInstruction {
@@ -105,6 +112,7 @@ pub mod instructions_tests {
 
             match self {
                 Add { id_rd, id_rr } => Self::add(registers, *id_rd, *id_rr),
+                Jmp { val_k } => Self::jmp(*val_k),
             }
         }
     }
@@ -112,6 +120,8 @@ pub mod instructions_tests {
     // 命令の実行テスト
     #[cfg(test)]
     mod run {
+        use crate::instructions;
+
         use super::*;
 
         // addの実行
@@ -158,6 +168,21 @@ pub mod instructions_tests {
                 RegisterUpdate::new(cycles, pc_update),
                 "register update is wrong"
             );
+        }
+
+        #[rstest]
+        #[case::defalut(1001, 0b0000_0000)]
+        fn jmp(#[case] k: usize, #[case] status: usize) {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            let mut user_ram = ExampleUserRam::new();
+            registers.write_to(RegisterType::ProgramCounter, 100);
+
+            // 命令実行
+            let instruction = ExampleInstruction::Jmp { val_k: k };
+            let result = instruction.run(&mut registers, &mut user_ram);
+
+            assert_eq!(result, RegisterUpdate::new(3, PCUpdate::Absolute(k)));
         }
     }
 }
