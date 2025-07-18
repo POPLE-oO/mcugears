@@ -45,7 +45,7 @@ Microcontroller unit emulator written in Rust
     - [x] ADD
     - [x] JMP
     - [x] PUSH
-    - [ ] POP
+    - [x] POP
     - [ ] NOP
     - [ ] MOV
     - [ ] CMP

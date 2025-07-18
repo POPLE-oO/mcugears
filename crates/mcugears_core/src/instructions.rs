@@ -23,6 +23,7 @@ pub mod instructions_tests {
         Jmp { val_k: usize },
         Push { id_rr: usize },
         Pop { id_rd: usize },
+        Nop,
     }
 
     impl ExampleInstruction {
@@ -144,14 +145,15 @@ pub mod instructions_tests {
             registers: &mut R,
             user_ram: &mut U,
         ) -> RegisterUpdate {
-            // 命令の実行
             use ExampleInstruction::*;
 
+            // 命令の実行
             match self {
                 Add { id_rd, id_rr } => Self::add(registers, *id_rd, *id_rr),
                 Jmp { val_k } => Self::jmp(*val_k),
                 Push { id_rr } => Self::push(registers, user_ram, *id_rr),
                 Pop { id_rd } => Self::pop(registers, user_ram, *id_rd),
+                Nop => RegisterUpdate::new(1, PointerUpdate::Increment),
             }
         }
     }
@@ -258,7 +260,7 @@ pub mod instructions_tests {
             assert_eq!(registers.read_from(RegisterType::Status), 0b0000_0000);
         }
 
-        // popのテスト
+        // pop
         #[test]
         fn pop() {
             // 初期化
@@ -276,6 +278,22 @@ pub mod instructions_tests {
             assert_eq!(registers.read_from(RegisterType::General { id: 12 }), 57);
             assert_eq!(registers.read_sp(), 0x5F7);
             assert_eq!(registers.read_from(RegisterType::Status), 0b0000_0000);
+        }
+
+        #[test]
+        fn nop() {
+            // 初期化
+            let mut registers = ExampleRegisters::new();
+            let mut user_ram = ExampleUserRam::new();
+
+            // 実行
+            let instruction = ExampleInstruction::Nop;
+            let result = instruction.run(&mut registers, &mut user_ram);
+
+            // テスト
+            assert_eq!(result, RegisterUpdate::new(1, PointerUpdate::Increment));
+            assert_eq!(registers, ExampleRegisters::new());
+            assert_eq!(user_ram, ExampleUserRam::new());
         }
     }
 }
